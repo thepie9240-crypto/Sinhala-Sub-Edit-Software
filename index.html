@@ -1,0 +1,2342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sinhala Subtitle Editor - Web</title>
+    <style>
+        :root {
+            --eng-font-size: 22px; --sin-font-size: 50px; --sin-color: #ffffff; --table-font-size: 20px; --eng-text-align: left;
+            --bg: #18191d; --nav: #222429; --panel: #2a2d35; --panel2: #343744; --line: rgba(255,255,255,0.08);
+            --text: #e8eaf0; --muted: #9aa0b4; --accent: #60a5fa; --blue: #2563eb; --green: #16a34a; --orange: #ea6a0a; --red: #dc3545;
+            --sin-font: 'Iskoola Pota', 'Nirmala UI', sans-serif;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        ::-webkit-scrollbar { width: 12px; height: 12px; }
+        ::-webkit-scrollbar-thumb { background: #4a4e5c; border-radius: 8px; border: 3px solid transparent; background-clip: padding-box; }
+        ::-webkit-scrollbar-thumb:hover { background: #5d6273; background-clip: padding-box; border: 3px solid transparent; }
+        ::-webkit-scrollbar-track { background: transparent; }
+
+        /* Top Navigation */
+        #top-nav { display: flex; flex-wrap: wrap; background: var(--nav); padding: 8px 14px; align-items: center; gap: 8px; border-bottom: 1px solid var(--line); }
+        .nav-tab { padding: 9px 16px; cursor: pointer; font-weight: 600; font-size: 15px; color: var(--muted); border-radius: 10px; transition: 0.15s; position: relative; white-space: nowrap; user-select: none; }
+        .nav-tab:hover { color: #fff; background: #2e313a; }
+        .nav-tab.active { color: #fff; background: #343846; }
+        .nav-tab.active::after { content: ''; position: absolute; left: 16px; right: 16px; bottom: 3px; height: 3px; border-radius: 3px; background: var(--accent); }
+        #video-name { flex: 1 1 100px; min-width: 0; text-align: center; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 10px; }
+        .nav-btn { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+
+        .view-container { flex-grow: 1; display: none; flex-direction: column; overflow: hidden; min-height: 0; }
+        .view-container.active { display: flex; }
+
+        /* Drag & Drop + Modals */
+        #dd-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(37, 99, 235, 0.85); color: white; display: none; justify-content: center; align-items: center; z-index: 999999; font-size: 35px; font-weight: bold; border: 8px dashed rgba(255,255,255,0.7); pointer-events: none; text-shadow: 2px 2px 5px rgba(0,0,0,0.5); }
+        .modal-bg { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.75); display: none; justify-content: center; align-items: center; z-index: 100000; backdrop-filter: blur(6px); }
+        .modal-box { background: #23252c; padding: 30px; border-radius: 16px; text-align: center; border: 1px solid var(--line); box-shadow: 0 20px 60px rgba(0,0,0,0.7); min-width: 400px; }
+        .modal-box h3 { margin-bottom: 10px; color: #fff; font-size: 22px; }
+        .modal-box p { color: var(--muted); font-size: 14px; margin-bottom: 20px; }
+
+        /* Buttons */
+        button, select { padding: 9px 16px; font-size: 14px; font-weight: 600; border: none; border-radius: 10px; cursor: pointer; background: var(--panel2); color: #fff; transition: 0.15s; outline: none; font-family: inherit; }
+        button:hover, select:hover { filter: brightness(1.2); }
+        button:active { transform: translateY(1px); }
+        select option { background: #2a2d35; color: #fff; }
+        .btn-blue { background: var(--blue); } .btn-green { background: var(--green); } .btn-orange { background: var(--orange); } .btn-red { background: var(--red); }
+        input[type=file] { display: none; }
+
+        /* Player */
+        #player-wrapper { flex-grow: 1; position: relative; background: #000; display: flex; justify-content: center; align-items: center; overflow: hidden; min-height: 0; }
+        video { width: 100%; height: 100%; object-fit: contain; outline: none; }
+        .sub-container { position: absolute; width: 92%; display: flex; flex-direction: column; gap: 8px; z-index: 10; align-items: center; pointer-events: none; }
+        #eng-sub-container { top: 20px; align-items: flex-start; }
+        #sin-sub-container { bottom: 60px; }
+        .sub-item { white-space: pre-wrap; text-shadow: 2px 2px 4px rgba(0,0,0,0.9), -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; width: 100%; pointer-events: auto; }
+        .eng-item { color: white; font-size: var(--eng-font-size); text-align: var(--eng-text-align); font-weight: bold; }
+        .sin-item { position: relative; color: var(--sin-color); font-size: var(--sin-font-size); font-family: var(--sin-font); text-align: center; cursor: pointer; transition: transform 0.12s; line-height: 1.35; }
+        .sin-item:hover { transform: scale(1.05); text-decoration: underline; text-shadow: 3px 3px 6px rgba(0,0,0,1), -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000; }
+        .sin-item::before { content: 'Click to edit'; position: absolute; left: 50%; top: -34px; transform: translateX(-50%); font: 600 14px 'Segoe UI', sans-serif; color: #fff; background: var(--blue); padding: 4px 14px; border-radius: 999px; white-space: nowrap; opacity: 0; pointer-events: none; text-shadow: none; text-decoration: none; transition: opacity 0.12s; }
+        .sin-item:hover::before { opacity: 1; }
+        .sin-edit-input { font-size: calc(var(--sin-font-size) * 0.8); font-family: var(--sin-font); text-align: center; background: rgba(24, 26, 33, 0.96); color: #fff; border-radius: 12px; padding: 12px 16px; width: 80%; max-width: 100%; z-index: 20; outline: none; border: 2px solid var(--accent); resize: none; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.6); line-height: 1.5; pointer-events: auto; }
+        .hover-word { transition: 0.15s ease-in-out; display: inline-block; padding: 0 2px; margin: 0 -2px; border-radius: 4px; }
+        .hover-word:hover { color: #90caf9; background-color: rgba(255,255,255,0.15); cursor: text; }
+        /* ASS tags mode */
+        .ass-toggle { display: inline-flex; align-items: center; gap: 10px; padding: 7px 14px; }
+        .ass-toggle .sw { width: 40px; height: 22px; border-radius: 999px; background: #4b4f5a; position: relative; transition: 0.2s; flex-shrink: 0; }
+        .ass-toggle .sw::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+        .ass-toggle.on { background: #1d4d33; }
+        .ass-toggle.on .sw { background: #22c55e; }
+        .ass-toggle.on .sw::after { left: 21px; }
+        #ass-layer { position: absolute; display: none; z-index: 11; pointer-events: none; }
+        .ass-zone { position: absolute; left: 2%; width: 96%; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+        .ass-pos { position: absolute; width: max-content; max-width: 92%; pointer-events: none; }
+        .ass-pos .sub-item { width: auto; }
+        #volume-osd { position: absolute; top: 20px; right: 20px; color: white; font-size: 22px; padding: 10px 20px; background: rgba(0,0,0,0.7); border-radius: 10px; display: none; z-index: 30; font-weight: bold; }
+
+        #translate-popup { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(20,20,24,0.92); backdrop-filter: blur(10px); border: 1px solid rgba(96,165,250,0.4); border-radius: 16px; padding: 30px 40px; color: white; text-align: center; z-index: 50; display: none; min-width: 40%; max-width: 80%; box-shadow: 0 20px 50px rgba(0,0,0,0.9); }
+        #translate-popup .eng-text { font-size: 20px; color: #ccc; margin-bottom: 20px; font-style: italic; line-height: 1.4; }
+        #translate-popup .sin-text { font-size: 36px; color: #81c784; font-family: var(--sin-font); font-weight: bold; line-height: 1.4; }
+        #translate-popup .close-hint { font-size: 14px; color: #777; margin-top: 25px; letter-spacing: 1px; }
+
+        /* Controls */
+        #controls-container { background: var(--nav); padding: 8px 14px 12px; display: flex; flex-direction: column; gap: 8px; z-index: 100; position: relative; border-top: 1px solid var(--line); }
+        .timeline-row { display: flex; align-items: center; gap: 14px; }
+        #time-label { font-size: 14px; font-weight: 600; min-width: 150px; text-align: right; font-variant-numeric: tabular-nums; }
+        .buttons-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        #audio-track-select { flex: 1 1 220px; max-width: 480px; min-width: 150px; background: var(--panel2); }
+        .push-right { margin-left: auto; }
+        .icon-btn { display: inline-flex; align-items: center; justify-content: center; padding: 9px 12px; }
+        input[type=range] { -webkit-appearance: none; appearance: none; flex: 1; height: 30px; background: transparent; cursor: pointer; --pct: 0%; }
+        input[type=range]::-webkit-slider-runnable-track { height: 6px; border-radius: 6px; background: linear-gradient(to right, var(--accent) var(--pct), #444857 var(--pct)); }
+        input[type=range]:hover::-webkit-slider-runnable-track { height: 8px; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid var(--blue); margin-top: -5px; }
+        input[type=range]:hover::-webkit-slider-thumb { margin-top: -4px; width: 18px; height: 18px; }
+
+        #settings-panel { position: absolute; bottom: 100%; right: 14px; background: #23252c; border: 1px solid var(--line); border-radius: 14px 14px 0 0; padding: 18px 20px; display: none; flex-direction: column; gap: 12px; min-width: 340px; box-shadow: 0 -8px 30px rgba(0,0,0,0.5); z-index: 200; }
+        .setting-item { display: flex; justify-content: space-between; align-items: center; gap: 20px; font-size: 14px; }
+        .setting-item input[type=number] { width: 90px; padding: 7px; border-radius: 8px; border: 1px solid var(--line); background: #33363f; color: #fff; text-align: center; font-weight: 600; font-size: 14px; outline: none; }
+        .setting-item input[type=number]:focus { border-color: var(--accent); }
+        .setting-item select { padding: 7px 10px; border-radius: 8px; min-width: 130px; }
+        .setting-item input[type=color] { width: 44px; height: 32px; border: none; background: none; padding: 0; cursor: pointer; }
+
+        /* Tables (shared dark style) */
+        #list-toolbar { display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-between; padding: 10px 16px; background: var(--nav); border-bottom: 1px solid var(--line); align-items: center; }
+        .table-container { flex-grow: 1; overflow: auto; background: var(--bg); position: relative; min-height: 0; }
+        table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--table-font-size); }
+        thead { position: sticky; top: 0; z-index: 5; }
+        th { background: #2d3039; color: #e6e8f0; text-align: left; padding: 12px 14px; font-weight: 600; font-size: 15px; }
+        td { padding: 12px 14px; vertical-align: top; border-bottom: 1px solid var(--line); line-height: 1.5; }
+        tbody tr:nth-child(even) td { background: rgba(255,255,255,0.025); }
+        tbody tr:hover td { background: rgba(255,255,255,0.06); }
+        tr.active-row td { background: #1e3a6e !important; color: #fff; }
+        .col-id { width: 56px; text-align: center; color: var(--muted); }
+        .col-time { width: 110px; font-variant-numeric: tabular-nums; color: #c9ccd8; }
+        .col-dur { width: 90px; text-align: center; color: var(--muted); }
+        .col-sin { width: 42%; cursor: pointer; font-family: var(--sin-font); transition: background 0.15s; }
+        .col-sin:hover { background: rgba(96,165,250,0.14) !important; }
+        .col-eng { width: 30%; color: #cfd2dd; }
+        .table-edit-input { width: 100%; min-height: 60px; font-family: var(--sin-font); font-size: var(--table-font-size); padding: 10px 12px; border: 2px solid var(--accent); border-radius: 10px; outline: none; resize: none; display: block; background: #252833; color: #fff; line-height: 1.5; overflow: hidden; }
+
+        /* Floating Context Editor */
+        #mini-window { position: fixed; top: 8%; right: 4%; width: 780px; height: 560px; background: var(--bg); border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; z-index: 99999; display: none; flex-direction: column; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.65); color: var(--text); }
+        #mini-header { background: #2d3039; padding: 12px 16px; cursor: move; font-weight: 600; display: flex; justify-content: space-between; align-items: center; user-select: none; }
+        #mini-toolbar { background: var(--nav); padding: 8px 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; border-bottom: 1px solid var(--line); }
+        #mini-table-wrapper { flex-grow: 1; overflow: auto; position: relative; min-height: 0; }
+        #mini-table th { padding: 10px 12px; }
+        #mini-table td { padding: 10px 12px; }
+        #mini-table thead { z-index: 2; }
+        .col-mini-eng { width: 38%; color: #cfd2dd; }
+        .col-mini-sin { font-family: var(--sin-font); cursor: pointer; transition: background 0.15s; }
+        .col-mini-sin:hover { background: rgba(96,165,250,0.14) !important; }
+        th.col-sin, th.col-mini-sin { font-family: 'Segoe UI', sans-serif; cursor: default; }
+        th.col-sin:hover, th.col-mini-sin:hover { background: #2d3039 !important; }
+        .mini-rz { position: absolute; z-index: 20; }
+        .mini-rz[data-dir=n] { top: 0; left: 12px; right: 12px; height: 6px; cursor: ns-resize; }
+        .mini-rz[data-dir=s] { bottom: 0; left: 12px; right: 12px; height: 6px; cursor: ns-resize; }
+        .mini-rz[data-dir=w] { left: 0; top: 12px; bottom: 12px; width: 6px; cursor: ew-resize; }
+        .mini-rz[data-dir=e] { right: 0; top: 12px; bottom: 12px; width: 6px; cursor: ew-resize; }
+        .mini-rz[data-dir=nw] { top: 0; left: 0; width: 16px; height: 16px; cursor: nwse-resize; }
+        .mini-rz[data-dir=se] { bottom: 0; right: 0; width: 16px; height: 16px; cursor: nwse-resize; }
+        .mini-rz[data-dir=ne] { top: 0; right: 0; width: 16px; height: 16px; cursor: nesw-resize; }
+        .mini-rz[data-dir=sw] { bottom: 0; left: 0; width: 16px; height: 16px; cursor: nesw-resize; }
+        body.no-eng .col-eng, body.no-eng .col-mini-eng, body.no-eng .rep-eng { display: none; }
+
+        /* Find & Replace */
+        #replace-modal .modal-box { min-width: 70vw; max-height: 88vh; display: flex; flex-direction: column; text-align: left; padding: 22px; }
+        .replace-inputs { display: flex; gap: 14px; margin-bottom: 14px; }
+        .replace-inputs input { flex: 1; padding: 12px; font-size: 18px; font-family: var(--sin-font); border: 1px solid var(--line); border-radius: 10px; background: #33363f; color: #fff; outline: none; }
+        .replace-inputs input:focus { border-color: var(--accent); }
+        .replace-table-container { flex-grow: 1; overflow: auto; background: var(--bg); border-radius: 10px; border: 1px solid var(--line); max-height: 55vh; }
+        .replace-table-container table { font-size: 17px; }
+        .replace-table-container td { font-family: var(--sin-font); }
+        .highlight-word { background: #facc15; color: #7f1d1d; font-weight: 700; padding: 0 3px; border-radius: 4px; }
+        .replace-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; }
+
+        /* How To Use guide */
+        .btn-help { background: #7c3aed; }
+        #help-modal { position: fixed; inset: 0; background: rgba(0,0,0,0.72); backdrop-filter: blur(6px); z-index: 200000; display: none; align-items: center; justify-content: center; padding: 24px; }
+        #help-modal.open { display: flex; }
+        .help-box { width: min(1120px, 100%); max-height: 100%; background: #1f2128; border: 1px solid rgba(255,255,255,0.12); border-radius: 20px; display: flex; flex-direction: column; box-shadow: 0 30px 80px rgba(0,0,0,0.7); overflow: hidden; }
+        .help-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 26px; background: linear-gradient(135deg, #2f3347, #232632); border-bottom: 1px solid var(--line); }
+        .help-head h2 { font-size: 24px; letter-spacing: 0.3px; }
+        .help-head p { color: var(--muted); font-size: 13px; margin-top: 3px; }
+        .help-close { background: rgba(255,255,255,0.08); width: 38px; height: 38px; padding: 0; border-radius: 50%; font-size: 18px; flex-shrink: 0; }
+        .help-body { overflow: auto; padding: 24px 26px 32px; }
+        .help-title { margin: 6px 0 14px; font-size: 18px; color: var(--accent); display: flex; align-items: center; gap: 10px; }
+        .help-title:not(:first-child) { margin-top: 30px; }
+        .help-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+        .step { background: #262a35; border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; gap: 14px; align-items: flex-start; font-size: 14px; line-height: 1.55; color: #cfd3e0; }
+        .step .num { flex-shrink: 0; width: 32px; height: 32px; border-radius: 50%; background: var(--blue); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+        .step b { color: #fff; display: block; margin-bottom: 3px; font-size: 15px; }
+        .help-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px; }
+        .help-card { background: #262a35; border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; }
+        .help-card h3 { font-size: 17px; margin-bottom: 10px; display: flex; gap: 10px; align-items: center; color: #fff; }
+        .help-card h3 .ic { width: 34px; height: 34px; border-radius: 10px; background: #343a4d; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; }
+        .help-card ul { margin-left: 18px; color: #cfd3e0; font-size: 14px; line-height: 1.7; }
+        .help-card li::marker { color: var(--accent); }
+        .help-card p { color: #cfd3e0; font-size: 14px; line-height: 1.6; }
+        .help-tip { margin-top: 10px; background: rgba(96,165,250,0.12); border-left: 3px solid var(--accent); border-radius: 6px; padding: 8px 12px; font-size: 13px; color: #cfe3ff; line-height: 1.5; }
+        kbd { background: #3a3f50; border: 1px solid #4a5066; border-bottom-width: 2px; border-radius: 6px; padding: 1px 8px; font: 600 12px 'Segoe UI', sans-serif; color: #fff; white-space: nowrap; }
+        .kb-table { width: 100%; border-collapse: collapse; font-size: 14px; background: #262a35; border-radius: 14px; overflow: hidden; }
+        .kb-table td { padding: 9px 16px; vertical-align: middle; border-bottom: 1px solid var(--line); line-height: 1.4; }
+        .kb-table td:first-child { width: 36%; white-space: nowrap; }
+        .kb-table td:last-child { color: #cfd3e0; }
+        .kb-table tbody tr:nth-child(even) td, .kb-table tbody tr:hover td { background: transparent; }
+
+        /* Responsive: shorten labels when the window gets narrow */
+        @media (max-width: 1050px) { .opt { display: none; } }
+        @media (max-width: 760px) { .lbl { display: none; } #time-label { min-width: 120px; } }
+
+        :fullscreen #top-nav { display: none !important; }
+        body.fs-mode #controls-container { position: fixed; left: 0; right: 0; bottom: 0; transform: translateY(105%); transition: transform 0.22s ease; background: rgba(20,21,26,0.94); backdrop-filter: blur(8px); border-top: 1px solid var(--line); }
+        body.fs-mode.show-controls #controls-container { transform: none; }
+        body.fs-mode.hide-cursor, body.fs-mode.hide-cursor * { cursor: none !important; }
+        #fs-hotzone { display: none; position: fixed; left: 0; right: 0; bottom: 0; height: 90px; z-index: 90; }
+        body.fs-mode #fs-hotzone { display: block; }
+        body.fs-mode.show-controls #fs-hotzone { pointer-events: none; }
+        :fullscreen #sin-sub-container { bottom: 40px; }
+    </style>
+</head>
+<body class="no-eng">
+
+    <!-- Drag & Drop Overlay -->
+    <div id="dd-overlay">
+        <div>📥 Drop your file here...</div>
+    </div>
+
+    <!-- Subtitle Selection Modal -->
+    <div id="sub-type-modal" class="modal-bg">
+        <div class="modal-box">
+            <h3>Which language does this subtitle belong to?</h3>
+            <p>Select whether you inserted an English subtitle or a Sinhala subtitle.</p>
+            <div style="display:flex; gap:10px; margin-top:20px; justify-content:center;">
+                <button class="btn-blue" id="btn-sel-eng">English</button>
+                <button class="btn-green" id="btn-sel-sin">Sinhala</button>
+                <button class="btn-orange" id="btn-sel-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Find & Replace Modal -->
+    <div id="replace-modal" class="modal-bg">
+        <div class="modal-box">
+            <h3 style="text-align: center; margin-bottom: 20px;">🔍 Find & Replace</h3>
+            
+            <div class="replace-inputs">
+                <input type="text" id="find-input" placeholder="Find word...">
+                <input type="text" id="replace-input" placeholder="Replace word...">
+            </div>
+
+            <div class="replace-table-container">
+                <table id="replace-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 50px; text-align: center;"><input type="checkbox" id="select-all-replace" checked title="Select All"></th>
+                            <th style="width: 100px;">Time</th>
+                            <th class="rep-eng" style="width: 40%;">English Text</th>
+                            <th style="width: 40%;">Sinhala Text</th>
+                        </tr>
+                    </thead>
+                    <tbody id="replace-tbody">
+                        <tr><td colspan="4" style="text-align: center; padding: 20px; color: #777;">Type the word you want to search for above.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="replace-actions">
+                <button class="btn-orange" onclick="closeReplaceModal()">Cancel</button>
+                <button class="btn-green" onclick="applyReplace()">Replace Selected</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Navigation Tabs -->
+    <div id="top-nav">
+        <div class="nav-tab active" onclick="switchTab('player')">🎬 <span class="lbl">Video Player</span></div>
+        <div class="nav-tab" onclick="switchTab('list')">📝 <span class="lbl">Subtitle List</span></div>
+
+        <div id="video-name" title=""></div>
+
+        <button class="nav-btn btn-help" onclick="openHelp()" title="How To Use (F1)">❓ <span class="lbl">How To Use</span></button>
+        <button class="nav-btn btn-red" onclick="clearAutoSavedData()" title="Clear Auto-Saved Data">🗑️ <span class="lbl">Clear Auto-Saved Data</span></button>
+        <button class="nav-btn btn-blue" onclick="openExternalEditor()" title="External window (F2)">🖥️ <span class="lbl">Window (F2)</span></button>
+        <button class="nav-btn" style="background: var(--panel2);" onclick="openReplaceModal()" title="Find & Replace (Ctrl)">🔍 <span class="lbl">Replace (Ctrl)</span></button>
+    </div>
+
+    <!-- 1. Video Player View -->
+    <div id="view-player" class="view-container active">
+        <div id="player-wrapper">
+            <video id="video-player"></video>
+            
+            <!-- Upgraded Overlay Containers for Multiple Subtitles -->
+            <div id="eng-sub-container" class="sub-container"></div>
+            <div id="sin-sub-container" class="sub-container"></div>
+            <!-- ASS tags mode layer (positioned subtitles) -->
+            <div id="ass-layer"></div>
+
+            <!-- Translate UI Popup -->
+            <div id="translate-popup">
+                <div class="eng-text">Loading...</div>
+                <div class="sin-text">⏳ Translating...</div>
+                <div class="close-hint">(Press = again to close)</div>
+            </div>
+
+            <div id="volume-osd">Volume: 100%</div>
+        </div>
+
+        <div id="controls-container">
+            <div id="settings-panel">
+                <div class="setting-item">
+                    <span>Eng Sub Position:</span>
+                    <select id="eng-pos-select">
+                        <option value="left" selected>Left</option>
+                        <option value="center">Center</option>
+                        <option value="right">Right</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <span>Eng Font Size (px):</span>
+                    <input type="number" id="eng-size-input" value="22" min="8" max="200">
+                </div>
+                <div class="setting-item">
+                    <span>Sin Font Size (px):</span>
+                    <input type="number" id="sin-size-input" value="50" min="8" max="200">
+                </div>
+                <div class="setting-item">
+                    <span>Sin Font Colour:</span>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input type="color" id="sin-color-input" value="#ffffff" style="display:none;">
+                        <select id="sin-color-select">
+                            <option value="#ffffff">White</option>
+                            <option value="#ffeb3b">Yellow</option>
+                            <option value="#00e5ff">Cyan</option>
+                            <option value="#81c784">Light Green</option>
+                            <option value="#ffab40">Orange</option>
+                            <option value="custom">Custom...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <span>Table Font Size (px):</span>
+                    <input type="number" id="table-size-input" value="20" min="12" max="40">
+                </div>
+                <div class="setting-item">
+                    <span>Arrow Skip Time (s):</span>
+                    <input type="number" id="seek-time-input" value="5" min="0.1" step="0.1">
+                </div>
+            </div>
+
+            <div class="timeline-row">
+                <input type="range" id="progress-bar" value="0" step="0.1" min="0">
+                <span id="time-label">00:00:00 / 00:00:00</span>
+            </div>
+            <div class="buttons-row">
+                <button onclick="document.getElementById('vid-upload').click()">1. Load Video</button>
+                <input type="file" id="vid-upload" accept="video/mp4,video/webm,video/x-matroska,.mkv">
+
+                <button onclick="document.getElementById('eng-upload').click()">2. Load Eng SRT</button>
+                <input type="file" id="eng-upload" accept=".srt">
+                <button id="clear-eng-btn" class="btn-red" style="display:none;" onclick="clearEnglishSubtitle()" title="Remove the loaded English subtitle">✖ Clear Eng<span class="opt"> Subtitle</span></button>
+
+                <button onclick="document.getElementById('sin-upload').click()">3. Load Sin SRT</button>
+                <input type="file" id="sin-upload" accept=".srt">
+
+                <button class="btn-blue" id="play-btn">▶ Play</button>
+                <button id="ass-btn" class="ass-toggle" title="Render ASS tags ({\an8}, {\pos}, {\i1}, {\c&amp;H..&amp;} ...) inside the subtitles"><span class="sw"></span><span>ASS Tags</span></button>
+                <button id="fs-btn">⛶ <span class="opt">Full Screen</span></button>
+                <button id="settings-btn" class="icon-btn" title="Settings"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.07-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.61-.22l-2.39.96a7 7 0 0 0-1.62-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.84a.5.5 0 0 0-.49.42l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.5.5 0 0 0-.61.22L2.67 8.48a.5.5 0 0 0 .12.64l2.03 1.58c-.05.31-.08.63-.08.94s.03.63.08.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.22.39.3.61.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.26.42.49.42h3.84c.24 0 .45-.18.49-.42l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.23.09.48 0 .61-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg></button>
+                <select id="audio-track-select" title="Change Audio Track"><option value="-1">Audio Info Not Loaded</option></select>
+
+                <button class="btn-orange overwrite-btn push-right">💾 Save<span class="opt"> to Original SRT</span></button>
+                <button class="btn-green save-btn">⬇️ Download<span class="opt"> New SRT</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Subtitle List View -->
+    <div id="view-list" class="view-container">
+        <div id="list-toolbar">
+            <button id="auto-scroll-btn" class="btn-blue" onclick="toggleAutoScroll()">Auto Scroll: ON</button>
+            <span style="font-size: 14px; color: #aaa;">(Scroll down manually to pause Auto-Scroll)</span>
+            <div style="display:flex; gap:10px;">
+                <button class="btn-orange overwrite-btn">💾 Save to Original</button>
+                <button class="btn-green save-btn">⬇️ Download New</button>
+            </div>
+        </div>
+        <div class="table-container" id="table-scroll-area">
+            <table id="sub-table">
+                <thead>
+                    <tr>
+                        <th class="col-id">#</th>
+                        <th class="col-time">Start Time</th>
+                        <th class="col-time">End Time</th>
+                        <th class="col-dur">Duration</th>
+                        <th class="col-eng">Original English Text</th>
+                        <th class="col-sin">Sinhala Text (Click to Edit)</th>
+                    </tr>
+                </thead>
+                <tbody id="sub-tbody">
+                    <!-- Rows generated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 3. Floating Mini Window -->
+    <div id="mini-window">
+        <div id="mini-header">
+            <span>Context Editor (Press 'Shift' to Hide)</span>
+            <span style="cursor: pointer; font-size: 18px;" onclick="toggleMiniWindow()">✖</span>
+        </div>
+        <div id="mini-toolbar">
+            <button id="mini-auto-scroll-btn" class="btn-blue" onclick="toggleMiniAutoScroll()">Auto Scroll: ON</button>
+            <div style="margin-left:auto; display:flex; gap:5px;">
+                <button class="btn-orange overwrite-btn" style="padding: 4px 10px;">💾 Save</button>
+                <button class="btn-green save-btn" style="padding: 4px 10px;">⬇️ Download</button>
+            </div>
+        </div>
+        <div id="mini-table-wrapper">
+            <table id="mini-table">
+                <thead>
+                    <tr>
+                        <th style="width: 15%;">Time</th>
+                        <th class="col-mini-eng">English Context</th>
+                        <th class="col-mini-sin">Sinhala (Edit)</th>
+                    </tr>
+                </thead>
+                <tbody id="mini-tbody">
+                    <!-- Mini Rows generated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- How To Use -->
+    <div id="help-modal" onclick="if (event.target === this) closeHelp()">
+        <div class="help-box">
+            <div class="help-head">
+                <div>
+                    <h2>📖 How To Use — Sinhala Subtitle Editor</h2>
+                    <p>Watch the video, click a Sinhala subtitle to fix it, then save. Press <kbd>F1</kbd> any time to open this guide.</p>
+                </div>
+                <button class="help-close" onclick="closeHelp()" title="Close (Esc)">✕</button>
+            </div>
+            <div class="help-body">
+
+                <div class="help-title">🚀 Quick start</div>
+                <div class="help-steps">
+                    <div class="step"><span class="num">1</span><div><b>Load the video</b>Click <kbd>1. Load Video</kbd> or simply drag &amp; drop the video file onto the window. MKV / MP4 with any number of audio tracks is fine.</div></div>
+                    <div class="step"><span class="num">2</span><div><b>Load subtitles</b><kbd>2. Load Eng SRT</kbd> (optional, for reference) and <kbd>3. Load Sin SRT</kbd> (the one you will edit). You can also drop .srt files — the app asks which language it is.</div></div>
+                    <div class="step"><span class="num">3</span><div><b>Watch &amp; fix</b>Click any Sinhala subtitle on the video (or press <kbd>Tab</kbd>) and type the correction. <kbd>Enter</kbd> saves it and continues playing.</div></div>
+                    <div class="step"><span class="num">4</span><div><b>Save</b>Click <kbd>Save to Original SRT</kbd> to overwrite the file, or <kbd>Download New SRT</kbd> to save a copy. Your work is also auto-saved every 5 seconds.</div></div>
+                </div>
+
+                <div class="help-title">✨ Features</div>
+                <div class="help-grid">
+
+                    <div class="help-card">
+                        <h3><span class="ic">▶️</span> Player controls</h3>
+                        <ul>
+                            <li><b>Play / Pause:</b> <kbd>Space</kbd>, the Play button, or double-click the video.</li>
+                            <li><b>Seek bar:</b> click anywhere on it to jump there, or drag it.</li>
+                            <li><b>Skip:</b> <kbd>←</kbd> / <kbd>→</kbd> jump back / forward (5 s by default, changeable in Settings).</li>
+                            <li><b>Volume:</b> <kbd>↑</kbd> / <kbd>↓</kbd> or the mouse wheel over the video. Goes up to 200%.</li>
+                            <li><b>Full Screen:</b> the button; press <kbd>Esc</kbd> to leave.</li>
+                        </ul>
+                        <div class="help-tip">In Full Screen the control bar hides itself. Move the mouse to the very bottom edge and it slides up (like VLC / PotPlayer).</div>
+                    </div>
+
+                    <div class="help-card">
+                        <h3><span class="ic">🔊</span> Audio tracks</h3>
+                        <ul>
+                            <li>Every audio track inside the file is detected and listed in the dropdown next to the settings icon, with its language, codec and channels. ★ marks the default track.</li>
+                            <li>Pick another track and it switches immediately — no waiting or loading, even for AC3 / DTS / E-AC3 audio.</li>
+                        </ul>
+                    </div>
+
+                    <div class="help-card">
+                        <h3><span class="ic">✏️</span> Editing a subtitle on the video</h3>
+                        <ul>
+                            <li>Move the mouse over a Sinhala subtitle: it grows slightly and a <b>"Click to edit"</b> tag appears.</li>
+                            <li>Click it (or press <kbd>Tab</kbd>) — the video pauses and an edit box opens. The box grows to show the whole text.</li>
+                            <li><kbd>Enter</kbd> or <kbd>Tab</kbd> saves and resumes playback. <kbd>Shift</kbd>+<kbd>Enter</kbd> adds a new line.</li>
+                            <li>The English subtitle is shown at the top of the video for reference (position and size can be changed).</li>
+                            <li>While the edit box is open: <kbd>Ctrl</kbd>+<kbd>U</kbd> puts <b>{\an8}</b> at the very start of the text (moves the subtitle to the top of the screen), and <kbd>Ctrl</kbd>+<kbd>I</kbd> wraps the whole text in <b>&lt;i&gt; … &lt;/i&gt;</b> (italic). Press <kbd>Ctrl</kbd>+<kbd>I</kbd> again to remove it. Works in the list / window editors too.</li>
+                        </ul>
+                    </div>
+
+                    <div class="help-card">
+                        <h3><span class="ic">🎨</span> ASS Tags mode</h3>
+                        <ul>
+                            <li>The <b>ASS Tags</b> switch next to Full Screen turns tag rendering on / off.</li>
+                            <li><b>ON:</b> tags such as <b>{\an8}</b>, <b>{\pos(x,y)}</b>, <b>{\i1}</b>, <b>{\b1}</b>, <b>{\c&amp;H00FFFF&amp;}</b> and <b>&lt;i&gt;</b>, <b>&lt;b&gt;</b>, <b>&lt;u&gt;</b>, <b>&lt;font color&gt;</b> are shown as styled / positioned subtitles instead of raw text.</li>
+                            <li>A subtitle moved by a tag is edited by clicking it right where it appears; the edit box opens in the same place and shows the full text with its tags.</li>
+                            <li><b>OFF:</b> subtitles are shown plainly, tags included, as before.</li>
+                        </ul>
+                    </div>
+
+                    <div class="help-card">
+                        <h3><span class="ic">📝</span> Subtitle List tab</h3>
+                        <ul>
+                            <li>Shows every subtitle with start / end time, duration, the English text (when loaded) and the Sinhala text.</li>
+                            <li>Click a Sinhala cell to edit it. The video jumps to that line and pauses. The box grows so long lines are fully visible.</li>
+                            <li><b>Auto Scroll</b> follows the video. Scrolling manually switches it off; click the button to turn it back on.</li>
+                        </ul>
+                    </div>
+
+                    <div class="help-card">
+                        <h3><span class="ic">🗔</span> Context Editor <kbd>Shift</kbd></h3>
+                        <ul>
+                            <li>Press <kbd>Shift</kbd> to show or hide a floating editor on top of the video: English context on the left, editable Sinhala on the right.</li>
+                            <li>Drag the title bar to move it. Drag any <b>edge or corner</b> to resize it. Its size and position are remembered.</li>
+                            <li>Has its own Auto Scroll, Save and Download buttons.</li>
+                        </ul>
+                    </div>
+
+                    <div class="help-card">
+                        <h3><span class="ic">🖥️</span> External Window <kbd>F2</kbd></h3>
+                        <ul>
+                            <li>Opens the same live-synced table in a separate window — perfect for a second monitor.</li>
+                            <li>It follows the video, highlights the current line and lets you edit just like the other tables.</li>
+                        </ul>
+                    </div>
+
+                    <div class="help-card">
+                        <h3><span class="ic">🔍</span> Find &amp; Replace <kbd>Ctrl</kbd></h3>
+                        <ul>
+                            <li>Type a word to see every Sinhala line that contains it, with the word highlighted.</li>
+                            <li>Untick the lines you do not want to change, type the new word and click <b>Replace Selected</b>.</li>
+                        </ul>
+                    </div>
+
+                    <div class="help-card">
+                        <h3><span class="ic">🌐</span> Translate <kbd>=</kbd></h3>
+                        <ul>
+                            <li>Press <kbd>=</kbd> to translate the current English subtitle into Sinhala (needs an internet connection).</li>
+                            <li>Hover over a single English word (the video pauses) or select some text first, and only that part is translated.</li>
+                            <li>Press <kbd>=</kbd> again or click the video to close the popup.</li>
+                        </ul>
+                    </div>
+
+                    <div class="help-card">
+                        <h3><span class="ic">⚙️</span> Settings</h3>
+                        <ul>
+                            <li>Click the gear icon beside Full Screen.</li>
+                            <li><b>Eng position &amp; size</b>, <b>Sinhala size</b> (default 50) and <b>Sinhala colour</b> (white by default, or pick any colour).</li>
+                            <li><b>Table font size</b> for the list, Context Editor and External Window, and the <b>arrow-key skip time</b>.</li>
+                            <li>Everything is remembered next time you open the app.</li>
+                        </ul>
+                    </div>
+
+                    <div class="help-card">
+                        <h3><span class="ic">💾</span> Saving &amp; auto-save</h3>
+                        <ul>
+                            <li><b>Save to Original SRT</b> writes straight into the Sinhala file you loaded — no dialog.</li>
+                            <li><b>Download New SRT</b> lets you choose a new file name and place.</li>
+                            <li>Your edits are auto-saved every 5 seconds. If the app closes unexpectedly, reopen it, load the video again and it continues from where you stopped.</li>
+                            <li><b>Clear Auto-Saved Data</b> wipes the saved session and starts fresh.</li>
+                        </ul>
+                    </div>
+
+                    <div class="help-card">
+                        <h3><span class="ic">🧹</span> Clearing English subtitles</h3>
+                        <ul>
+                            <li>Once an English SRT is loaded, a red <b>✖ Clear Eng Subtitle</b> button appears. Click it to remove the English subtitle (and its columns) everywhere.</li>
+                            <li>Load a different English file any time with <kbd>2. Load Eng SRT</kbd>.</li>
+                        </ul>
+                    </div>
+
+                    <div class="help-card">
+                        <h3><span class="ic">💡</span> Handy tips</h3>
+                        <ul>
+                            <li>The video file name is shown small at the top of the window.</li>
+                            <li>The window size and position are remembered. It also adapts when you make it small.</li>
+                            <li>Subtitle timing is never changed — only the text you edit.</li>
+                            <li>Overlapping subtitles are all shown and each can be edited separately.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="help-title">⌨️ Keyboard &amp; mouse shortcuts</div>
+                <table class="kb-table">
+                    <tbody>
+                        <tr><td><kbd>Space</kbd></td><td>Play / Pause</td></tr>
+                        <tr><td><kbd>←</kbd> &nbsp;<kbd>→</kbd></td><td>Skip backward / forward (seconds set in Settings)</td></tr>
+                        <tr><td><kbd>↑</kbd> &nbsp;<kbd>↓</kbd> &nbsp;or&nbsp; <kbd>Mouse wheel</kbd></td><td>Volume up / down (up to 200%)</td></tr>
+                        <tr><td><kbd>Double-click</kbd> the video</td><td>Play / Pause</td></tr>
+                        <tr><td><kbd>Click</kbd> a Sinhala subtitle &nbsp;or&nbsp; <kbd>Tab</kbd></td><td>Edit the subtitle (Tab edits the first one showing)</td></tr>
+                        <tr><td><kbd>Enter</kbd> / <kbd>Tab</kbd> (while editing)</td><td>Save and continue playing</td></tr>
+                        <tr><td><kbd>Shift</kbd>+<kbd>Enter</kbd> (while editing)</td><td>New line inside the subtitle</td></tr>
+                        <tr><td><kbd>Shift</kbd></td><td>Show / hide the Context Editor</td></tr>
+                        <tr><td><kbd>F2</kbd></td><td>Open the External Window</td></tr>
+                        <tr><td><kbd>Ctrl</kbd></td><td>Open Find &amp; Replace</td></tr>
+                        <tr><td><kbd>=</kbd></td><td>Translate the current English subtitle / hovered word / selection</td></tr>
+                        <tr><td><kbd>Ctrl</kbd>+<kbd>U</kbd> <small>(in edit box)</small></td><td>Add <b>{\an8}</b> at the start of the text (subtitle goes to the top)</td></tr>
+                        <tr><td><kbd>Ctrl</kbd>+<kbd>I</kbd> <small>(in edit box)</small></td><td>Wrap the text in <b>&lt;i&gt; … &lt;/i&gt;</b> (italic); press again to remove</td></tr>
+                        <tr><td><kbd>F1</kbd></td><td>Open this guide</td></tr>
+                        <tr><td><kbd>Esc</kbd></td><td>Close this guide / leave Full Screen</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="fs-hotzone"></div>
+
+    <script>
+        // --- Core Variables ---
+        const video = document.getElementById('video-player');
+        const engSubContainer = document.getElementById('eng-sub-container');
+        const sinSubContainer = document.getElementById('sin-sub-container');
+        const osdLabel = document.getElementById('volume-osd');
+        const progressBar = document.getElementById('progress-bar');
+        const timeLabel = document.getElementById('time-label');
+        const playBtn = document.getElementById('play-btn');
+        const audioSelect = document.getElementById('audio-track-select');
+        
+        // List View Elements
+        const autoScrollBtn = document.getElementById('auto-scroll-btn');
+        const tableScrollArea = document.getElementById('table-scroll-area');
+        const tbody = document.getElementById('sub-tbody');
+
+        // Mini Window Elements
+        const miniWindow = document.getElementById('mini-window');
+        const miniHeader = document.getElementById('mini-header');
+        const miniTableWrapper = document.getElementById('mini-table-wrapper');
+        const miniTbody = document.getElementById('mini-tbody');
+        const miniAutoScrollBtn = document.getElementById('mini-auto-scroll-btn');
+        
+        // Translate Popup Elements
+        const translatePopup = document.getElementById('translate-popup');
+        let isTranslatePopupOpen = false;
+        let currentlyHoveredWord = "";
+
+        // Find & Replace Elements
+        const replaceModal = document.getElementById('replace-modal');
+        const findInput = document.getElementById('find-input');
+        const replaceInput = document.getElementById('replace-input');
+        const replaceTbody = document.getElementById('replace-tbody');
+        const selectAllReplaceCb = document.getElementById('select-all-replace');
+
+        // Application State
+        let engSubs = [];
+        let sinSubs = [];
+        
+        // File System Access Variable (For saving to original file)
+        let srtFileHandle = null;
+        let srtFilePath = '';
+        
+        // Array to support overlapping highlights
+        let currentSinIndices = []; 
+        let playerEditingIndex = -1; // -1 means no active inline edit on player
+        
+        let osdTimeout;
+        let wasPlayingBeforeEdit = false;
+        
+        let isAutoScrollEnabled = true;
+        let isMiniAutoScrollEnabled = true;
+
+        // Subtitle Load States for D&D
+        let isEngLoaded = false;
+        let isSinLoaded = false;
+        let pendingSrtFile = null;
+        
+        // --- External Window (F2) Variables ---
+        let extWin = null;
+        let extAutoScroll = true;
+        let extEditingIndex = -1;
+
+        // --- Auto Save (Local Storage) Variables ---
+        let pendingCookieTime = 0;
+        let autoSaveInterval = null;
+
+        // --- WEB AUDIO API (For 200% Volume Boost) ---
+        let audioCtx = null;
+        let gainNode = null;
+        let mediaSource = null;
+        let playerVolume = 1.0;
+
+        // --- Escape HTML Function to Prevent Layout Breakage ---
+        function escapeHTML(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        // --- Live audio track engine (ffmpeg via Electron) ---
+        // Tracks are read with ffprobe (like VLC / PotPlayer). The chosen track is decoded live by
+        // ffmpeg starting at the current position and played in a hidden <audio> kept in sync
+        // with the muted video, so switching tracks is instant (no pre-conversion).
+        const extAudio = new Audio();
+        extAudio.crossOrigin = 'anonymous';
+        extAudio.preload = 'auto';
+        let extSource = null, extMode = false, extStreamActive = false;
+        let probedTracks = null, currentVideoPath = '', currentTrackN = 0;
+        let extOffset = 0, extStartTimer = null, extRestartTimer = null, audioBase = null;
+
+        function routeAudio() {
+            if (!audioCtx || !gainNode) return;
+            try { mediaSource.disconnect(); } catch (e) {}
+            try { if (extSource) extSource.disconnect(); } catch (e) {}
+            if (extMode) {
+                if (!extSource) extSource = audioCtx.createMediaElementSource(extAudio);
+                extSource.connect(gainNode);
+            } else {
+                mediaSource.connect(gainNode);
+            }
+        }
+
+        function applyVolume() {
+            if (extMode) {
+                video.volume = 1.0;
+                if (gainNode) { extAudio.volume = 1.0; gainNode.gain.value = playerVolume; }
+                else extAudio.volume = Math.min(1.0, playerVolume);
+            } else if (gainNode) {
+                if (playerVolume > 1.0) { video.volume = 1.0; gainNode.gain.value = playerVolume; }
+                else { video.volume = playerVolume; gainNode.gain.value = 1.0; }
+            } else {
+                video.volume = Math.min(1.0, playerVolume);
+            }
+        }
+
+        function stopExtStream() {
+            clearTimeout(extStartTimer); clearTimeout(extRestartTimer);
+            extStreamActive = false;
+            extAudio.pause();
+            extAudio.removeAttribute('src');
+            extAudio.load();
+        }
+
+        function startExtStream() {
+            if (!extMode || !probedTracks || !audioBase) return;
+            clearTimeout(extStartTimer);
+            const t = probedTracks[currentTrackN];
+            // small lead so the stream (ffmpeg start-up) is ready when the video reaches that time
+            extOffset = Math.max(0, video.currentTime + (video.paused ? 0 : 0.4));
+            extAudio.pause();
+            extAudio.src = `http://127.0.0.1:${audioBase.port}/a?k=${audioBase.token}&f=${encodeURIComponent(currentVideoPath)}&i=${t.index}&t=${extOffset.toFixed(3)}`;
+            extAudio.playbackRate = video.playbackRate;
+            extStreamActive = true;
+            extAudio.load();
+        }
+
+        function restartExtStream(delay) {
+            if (!extMode) return;
+            clearTimeout(extRestartTimer);
+            extRestartTimer = setTimeout(startExtStream, delay);
+        }
+
+        function tryStartExt() {
+            clearTimeout(extStartTimer);
+            if (!extMode || !extStreamActive || video.paused || video.seeking || !extAudio.paused) return;
+            const wait = (extOffset - video.currentTime) * 1000;
+            if (wait > 10) { extStartTimer = setTimeout(tryStartExt, wait); return; }
+            extAudio.play().catch(() => {});
+        }
+
+        extAudio.addEventListener('canplay', tryStartExt);
+        video.addEventListener('play', tryStartExt);
+        video.addEventListener('playing', tryStartExt);
+        video.addEventListener('pause', () => { if (extMode) { clearTimeout(extStartTimer); extAudio.pause(); } });
+        video.addEventListener('waiting', () => { if (extMode) { clearTimeout(extStartTimer); extAudio.pause(); } });
+        video.addEventListener('seeked', () => { if (extMode && extStreamActive) restartExtStream(120); });
+        video.addEventListener('ratechange', () => { extAudio.playbackRate = video.playbackRate; });
+        setInterval(() => {
+            if (!extMode || !extStreamActive || video.paused || video.seeking || extAudio.paused) return;
+            const drift = (extAudio.currentTime + extOffset) - video.currentTime;
+            if (Math.abs(drift) > 0.35) restartExtStream(0);
+            else if (Math.abs(drift) > 0.06) extAudio.playbackRate = video.playbackRate * (drift > 0 ? 0.96 : 1.04);
+            else extAudio.playbackRate = video.playbackRate;
+        }, 300);
+
+        function trackLabel(t) {
+            let lang = t.lang;
+            if (!lang || lang === 'und') lang = 'Unknown';
+            else { try { lang = new Intl.DisplayNames(['en'], { type: 'language' }).of(lang) || lang; } catch (e) {} }
+            const codecs = { ac3: 'AC3', eac3: 'E-AC3', dts: 'DTS', truehd: 'TrueHD', aac: 'AAC', mp3: 'MP3', opus: 'Opus', vorbis: 'Vorbis', flac: 'FLAC' };
+            const codec = codecs[t.codec] || (t.codec || '').toUpperCase();
+            const ch = t.layout || (t.channels ? t.channels + 'ch' : '');
+            return `${t.n + 1}. ${lang}${t.title ? ' - ' + t.title : ''} [${codec} ${ch}]${t.isDefault ? ' ★' : ''}`;
+        }
+
+        async function setupAudioTracks(info) {
+            probedTracks = info.audio;
+            audioSelect.innerHTML = '';
+            if (probedTracks.length === 0) {
+                audioSelect.innerHTML = '<option value="-1">No audio track</option>';
+                video.muted = false;
+                return;
+            }
+            probedTracks.forEach(t => {
+                const o = document.createElement('option');
+                o.value = t.n; o.text = trackLabel(t); audioSelect.appendChild(o);
+            });
+            const safe = ['aac', 'mp3', 'opus', 'vorbis', 'flac'];
+            if (probedTracks.length === 1 && safe.includes(probedTracks[0].codec)) { video.muted = false; return; } // plays natively
+            if (!audioBase) audioBase = await window.nativeApi.audioBase();
+            let start = probedTracks.findIndex(t => t.isDefault);
+            if (start < 0) start = 0;
+            audioSelect.value = String(start);
+            selectAudioTrack(start, false);
+        }
+
+        function selectAudioTrack(n, announce = true) {
+            currentTrackN = n;
+            extMode = true;
+            video.muted = true;
+            initAudioAPI(); routeAudio(); applyVolume();
+            startExtStream();
+            if (announce) showOSD(`🔊 Audio: ${audioSelect.options[audioSelect.selectedIndex].text}`);
+        }
+
+        function initAudioAPI() {
+            if (!audioCtx) {
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if(AudioContext) {
+                        audioCtx = new AudioContext();
+                        if (!mediaSource) mediaSource = audioCtx.createMediaElementSource(video);
+                        gainNode = audioCtx.createGain();
+                        gainNode.connect(audioCtx.destination);
+                        routeAudio();
+                        applyVolume();
+                    }
+                } catch(e) {
+                    console.error("Web Audio API Initialized Failed:", e);
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        // --- Track Hovered Word ---
+        document.addEventListener('mouseover', (e) => {
+            if (e.target && e.target.classList && e.target.classList.contains('hover-word')) {
+                currentlyHoveredWord = e.target.innerText.trim();
+                if (!video.paused) {
+                    video.pause();
+                    playBtn.innerHTML = "▶ Play";
+                }
+            } else {
+                currentlyHoveredWord = "";
+            }
+        });
+
+        // --- Tab Switching Logic ---
+        function switchTab(tabName) {
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.view-container').forEach(v => v.classList.remove('active'));
+            
+            if(tabName === 'player') {
+                document.querySelector('.nav-tab:nth-child(1)').classList.add('active');
+                document.getElementById('view-player').classList.add('active');
+            } else {
+                document.querySelector('.nav-tab:nth-child(2)').classList.add('active');
+                document.getElementById('view-list').classList.add('active');
+                if(isAutoScrollEnabled) scrollToActiveRow('main');
+            }
+        }
+
+        // --- Helper Functions ---
+        function timeToSeconds(timeStr) {
+            const parts = timeStr.replace(',', '.').split(':');
+            return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
+        }
+
+        function secondsToTime(seconds) {
+            const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+            const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+            const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+            const ms = Math.round((seconds % 1) * 1000).toString().padStart(3, '0');
+            return `${h}:${m}:${s},${ms}`;
+        }
+
+        function formatDisplayTime(seconds) {
+            if(isNaN(seconds)) return "00:00:00";
+            const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
+            const m = Math.floor((seconds % 3600) / 60).toString().padStart(2, '0');
+            const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+            return `${h}:${m}:${s}`;
+        }
+
+        function parseSRT(data) {
+            const subs = [];
+            const blocks = data.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split(/\n{2,}/);
+            for (let block of blocks) {
+                const lines = block.trim().split('\n');
+                if (lines.length >= 3) {
+                    let timeLineIdx = -1;
+                    for(let i=0; i<lines.length; i++) {
+                        // Regex fix to prevent crashes from inner subtitle texts with '-->'
+                        if (/^\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}/.test(lines[i].trim())) { 
+                            timeLineIdx = i; 
+                            break; 
+                        }
+                    }
+                    if (timeLineIdx !== -1) {
+                        const times = lines[timeLineIdx].split('-->');
+                        subs.push({
+                            id: timeLineIdx > 0 ? lines[0] : "",
+                            start: timeToSeconds(times[0].trim()),
+                            end: timeToSeconds(times[1].trim()),
+                            text: lines.slice(timeLineIdx + 1).join('\n')
+                        });
+                    }
+                }
+            }
+            subs.sort((a, b) => a.start - b.start);
+            return subs;
+        }
+
+        // Function to get ALL overlapping subtitles simultaneously
+        function getSubtitlesAtTime(subs, time) {
+            let matches = [];
+            for (let i = 0; i < subs.length; i++) {
+                if (time >= subs[i].start && time <= subs[i].end) {
+                    matches.push({ index: i, sub: subs[i] });
+                }
+                // Optimization: Because subtitles are sorted by start time, 
+                // if the start time is greater than current time, we can stop scanning forward safely.
+                if (subs[i].start > time) break;
+            }
+            return matches;
+        }
+
+        function showOSD(text) {
+            osdLabel.innerText = text; osdLabel.style.display = 'block';
+            clearTimeout(osdTimeout); osdTimeout = setTimeout(() => { osdLabel.style.display = 'none'; }, 2000);
+        }
+
+        // --- Local Storage Auto Save System ---
+        function checkAutoSavedData() {
+            const savedData = localStorage.getItem('proWebSubEditorData');
+            if (savedData) {
+                try {
+                    const data = JSON.parse(savedData);
+                    if (data.engSubs && data.engSubs.length > 0) { engSubs = data.engSubs; isEngLoaded = true; }
+                    if (data.sinSubs && data.sinSubs.length > 0) { sinSubs = data.sinSubs; isSinLoaded = true; }
+                    if (data.currentTime) { pendingCookieTime = data.currentTime; }
+                    
+                    if (isEngLoaded || isSinLoaded) {
+                        generateTables();
+                        alert("✅ Previous editing session automatically restored!\n\nPlease load the relevant Video File.");
+                        startAutoSave(); 
+                    }
+                } catch(e) { console.error("Error parsing auto-saved data", e); }
+            }
+        }
+
+        function startAutoSave() {
+            if (autoSaveInterval) clearInterval(autoSaveInterval);
+            autoSaveInterval = setInterval(() => {
+                if (sinSubs.length > 0 || engSubs.length > 0) {
+                    try {
+                        const dataToSave = {
+                            engSubs: engSubs,
+                            sinSubs: sinSubs,
+                            currentTime: video.currentTime || pendingCookieTime
+                        };
+                        localStorage.setItem('proWebSubEditorData', JSON.stringify(dataToSave));
+                    } catch (e) {
+                        console.warn("Auto-save failed: LocalStorage full!", e);
+                        clearInterval(autoSaveInterval);
+                        showOSD("⚠️ Storage Full! Auto-save disabled.");
+                    }
+                }
+            }, 5000);
+        }
+
+        function clearAutoSavedData() {
+            if(confirm("⚠️ Are you sure? This will delete all unsaved new data.")) {
+                localStorage.removeItem('proWebSubEditorData');
+                clearInterval(autoSaveInterval);
+                location.reload(); 
+            }
+        }
+
+        window.addEventListener('load', checkAutoSavedData);
+
+        function syncEngUI() {
+            document.getElementById('clear-eng-btn').style.display = engSubs.length ? '' : 'none';
+            document.body.classList.toggle('no-eng', engSubs.length === 0);
+        }
+        function clearEnglishSubtitle() {
+            engSubs = []; isEngLoaded = false;
+            engSubContainer.innerHTML = ''; engSubContainer.dataset.rawText = '';
+            document.getElementById('eng-upload').value = '';
+            generateTables(); syncEngUI();
+            if (extWin && !extWin.closed) renderExternalTable();
+            showOSD("English subtitle cleared");
+        }
+        window.addEventListener('load', () => syncEngUI());
+
+        // --- Core File Loading Functions ---
+        function loadVideoFile(file) {
+            // Reset live-audio state for the new video
+            extMode = false; probedTracks = null;
+            stopExtStream();
+            video.muted = false;
+            routeAudio();
+            video.src = URL.createObjectURL(file);
+            applyVolume();
+            { const vn = document.getElementById('video-name'); vn.textContent = file.name; vn.title = file.name; document.title = 'Sinhala Subtitle Editor - ' + file.name; }
+            if (window.nativeApi) {
+                const fp = window.nativeApi.getPath(file);
+                if (fp) {
+                    currentVideoPath = fp;
+                    video.muted = true; // silent until the track list is known (avoids double audio)
+                    window.nativeApi.probe(fp).then(setupAudioTracks).catch(e => { console.error('ffprobe failed', e); video.muted = false; });
+                }
+            }
+            
+            video.play().then(() => {
+                initAudioAPI();
+            }).catch(e => {
+                console.log("Autoplay prevented, requires user click.");
+            });
+            
+            playBtn.innerHTML = "⏸ Pause";
+            showOSD("🎬 Video Loaded Successfully!");
+        }
+
+        function loadSRTFile(file, isEng) {
+            // Reset the file handle since we loaded a new file
+            if (!isEng) { srtFileHandle = null; srtFilePath = (window.nativeApi && window.nativeApi.getPath) ? (window.nativeApi.getPath(file) || '') : ''; }
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                if (isEng) {
+                    engSubs = parseSRT(event.target.result);
+                    isEngLoaded = true;
+                    showOSD("✅ English Subtitle Loaded!");
+                    if(isSinLoaded) generateTables();
+                } else {
+                    sinSubs = parseSRT(event.target.result);
+                    isSinLoaded = true;
+                    generateTables();
+                    showOSD("✅ Sinhala Subtitle Loaded!");
+                }
+                syncEngUI();
+                startAutoSave();
+            };
+            reader.readAsText(file);
+        }
+
+        // --- File Inputs (Manual Load) ---
+        document.getElementById('vid-upload').addEventListener('change', function(e) {
+            if(e.target.files[0]) loadVideoFile(e.target.files[0]);
+        });
+        document.getElementById('eng-upload').addEventListener('change', (e) => {
+            if(e.target.files[0]) loadSRTFile(e.target.files[0], true);
+        });
+        document.getElementById('sin-upload').addEventListener('change', (e) => {
+            if(e.target.files[0]) loadSRTFile(e.target.files[0], false);
+        });
+
+        // --- Drag & Drop Implementation ---
+        const ddOverlay = document.getElementById('dd-overlay');
+        const subTypeModal = document.getElementById('sub-type-modal');
+        let dragCounter = 0;
+
+        document.body.addEventListener('dragover', (e) => { e.preventDefault(); });
+        document.body.addEventListener('dragenter', (e) => { e.preventDefault(); dragCounter++; ddOverlay.style.display = 'flex'; });
+        document.body.addEventListener('dragleave', (e) => { e.preventDefault(); dragCounter--; if(dragCounter === 0) ddOverlay.style.display = 'none'; });
+
+        document.body.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dragCounter = 0;
+            ddOverlay.style.display = 'none';
+            initAudioAPI(); 
+            
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                const file = e.dataTransfer.files[0];
+                const name = file.name.toLowerCase();
+                const type = file.type;
+
+                if (type.startsWith('video/') || name.endsWith('.mkv') || name.endsWith('.mp4') || name.endsWith('.webm') || name.endsWith('.avi')) {
+                    loadVideoFile(file);
+                } 
+                else if (name.endsWith('.srt')) {
+                    if (isEngLoaded && !isSinLoaded) { loadSRTFile(file, false); } 
+                    else if (!isEngLoaded && isSinLoaded) { loadSRTFile(file, true); } 
+                    else {
+                        pendingSrtFile = file;
+                        subTypeModal.style.display = 'flex';
+                    }
+                } else {
+                    alert("⚠️ Unsupported file format. Please drop a Video or SRT file.");
+                }
+            }
+        });
+
+        document.getElementById('btn-sel-eng').addEventListener('click', () => { if (pendingSrtFile) loadSRTFile(pendingSrtFile, true); subTypeModal.style.display = 'none'; pendingSrtFile = null; });
+        document.getElementById('btn-sel-sin').addEventListener('click', () => { if (pendingSrtFile) loadSRTFile(pendingSrtFile, false); subTypeModal.style.display = 'none'; pendingSrtFile = null; });
+        document.getElementById('btn-sel-cancel').addEventListener('click', () => { subTypeModal.style.display = 'none'; pendingSrtFile = null; });
+
+
+        // --- External Tab/Window Editor (F2) ---
+        function openExternalEditor() {
+            if (extWin && !extWin.closed) {
+                extWin.focus();
+                return;
+            }
+            
+            extWin = window.open("", "ExternalEditor", "width=600,height=800,left=200,top=100");
+            
+            if(!extWin) {
+                alert("This action was blocked by the Popup Blocker. Please allow popups.");
+                return;
+            }
+
+            extWin.document.write(`
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <title>External Editor - Sinhala Subtitle</title>
+                    <style>
+                        :root { --table-font-size: 20px; }
+                        body { background: #18191d; color: #e8eaf0; font-family: 'Segoe UI', Tahoma, sans-serif; margin: 0; padding: 12px; display: flex; flex-direction: column; height: 100vh; overflow: hidden; box-sizing: border-box; }
+                        * { box-sizing: border-box; }
+                        ::-webkit-scrollbar { width: 12px; } ::-webkit-scrollbar-thumb { background: #4a4e5c; border-radius: 8px; border: 3px solid transparent; background-clip: padding-box; } ::-webkit-scrollbar-track { background: transparent; }
+                        .toolbar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; padding-bottom: 10px; margin-bottom: 8px; align-items: center; }
+                        button { padding: 9px 16px; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; color: white; outline: none; transition: 0.15s; font-size: 14px; }
+                        button:hover { filter: brightness(1.2); }
+                        .btn-blue { background: #2563eb; } .btn-orange { background: #ea6a0a; } .btn-green { background: #16a34a; }
+                        #ext-scroll-area { flex-grow: 1; overflow: auto; border-radius: 10px; position: relative; }
+                        table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: var(--table-font-size); }
+                        th { position: sticky; top: 0; background: #2d3039; padding: 12px 14px; z-index: 5; text-align: left; font-weight: 600; font-size: 15px; }
+                        td { padding: 12px 14px; vertical-align: top; border-bottom: 1px solid rgba(255,255,255,0.08); line-height: 1.5; }
+                        .col-time { width: 100px; color: #c9ccd8; font-variant-numeric: tabular-nums; }
+                        body.no-eng .col-eng { display: none; }
+                        .col-eng { width: 40%; color: #cfd2dd; }
+                        .col-sin { cursor: pointer; font-family: 'Iskoola Pota', 'Nirmala UI', sans-serif; transition: background 0.15s; }
+                        .col-sin:hover { background: rgba(96,165,250,0.14); }
+                        tbody tr:nth-child(even) td { background: rgba(255,255,255,0.025); }
+                        tr.active-row td { background: #1e3a6e !important; color: #fff; }
+                        textarea { width: 100%; min-height: 60px; font-family: 'Iskoola Pota', 'Nirmala UI', sans-serif; font-size: var(--table-font-size); padding: 10px 12px; border: 2px solid #60a5fa; border-radius: 10px; outline: none; resize: none; display: block; background: #252833; color: #fff; line-height: 1.5; overflow: hidden; }
+                    </style>
+                </head>
+                <body>
+                    <div class="toolbar">
+                        <button id="ext-auto-scroll" class="btn-blue">Auto Scroll: ON</button>
+                        <span style="font-size: 12px; color: #aaa;">Live Synced with Main Player</span>
+                        <div style="display:flex; gap:5px;">
+                            <button id="ext-overwrite" class="btn-orange">💾 Save to Original</button>
+                            <button id="ext-save" class="btn-green">⬇️ Download SRT</button>
+                        </div>
+                    </div>
+                    <div id="ext-scroll-area">
+                        <table id="ext-table">
+                            <thead><tr><th>Time</th><th class="col-eng">English Context</th><th>Sinhala (Edit)</th></tr></thead>
+                            <tbody id="ext-tbody"></tbody>
+                        </table>
+                    </div>
+                </body>
+                </html>
+            `);
+            extWin.document.close();
+
+            const extScrollBtn = extWin.document.getElementById('ext-auto-scroll');
+            extScrollBtn.onclick = () => {
+                extAutoScroll = !extAutoScroll;
+                if(extAutoScroll) { extScrollBtn.innerText = "Auto Scroll: ON"; extScrollBtn.className = "btn-blue"; }
+                else { extScrollBtn.innerText = "Auto Scroll: OFF"; extScrollBtn.className = "btn-orange"; }
+            };
+
+            extWin.document.getElementById('ext-scroll-area').onwheel = () => {
+                extAutoScroll = false;
+                extScrollBtn.innerText = "Auto Scroll: OFF"; extScrollBtn.className = "btn-orange";
+            };
+
+            extWin.document.getElementById('ext-save').onclick = () => {
+                document.querySelector('.save-btn').click();
+            };
+
+            extWin.document.getElementById('ext-overwrite').onclick = () => {
+                saveToOriginalSRT();
+            };
+
+            applyExtVars();
+            renderExternalTable();
+        }
+
+        function applyExtVars() {
+            if (!extWin || extWin.closed) return;
+            const r = extWin.document.documentElement.style;
+            r.setProperty('--table-font-size', settings.tableSize + 'px');
+        }
+
+        function renderExternalTable() {
+            if(!extWin || extWin.closed) return;
+            extWin.document.body.classList.toggle('no-eng', engSubs.length === 0);
+            const extTbody = extWin.document.getElementById('ext-tbody');
+            extTbody.innerHTML = '';
+            
+            sinSubs.forEach((sub, i) => {
+                const matchedEng = getSubtitlesAtTime(engSubs, sub.start + 0.1);
+                let eText = matchedEng.map(m => m.sub.text).join('\n\n'); 
+
+                const tr = extWin.document.createElement('tr');
+                tr.id = `ext-row-${i}`;
+                tr.innerHTML = `
+                    <td class="col-time">${secondsToTime(sub.start).slice(0,-4)}</td>
+                    <td class="col-eng">${escapeHTML(eText).replace(/\n/g, '<br>')}</td>
+                    <td class="col-sin" id="ext-cell-${i}">${escapeHTML(sub.text).replace(/\n/g, '<br>')}</td>
+                `;
+                
+                tr.querySelector('.col-sin').onclick = () => { editInExternalTable(i); };
+                extTbody.appendChild(tr);
+            });
+            
+            currentSinIndices.forEach(idx => {
+                const actRow = extWin.document.getElementById(`ext-row-${idx}`);
+                if(actRow) actRow.classList.add('active-row');
+            });
+        }
+
+        function editInExternalTable(index) {
+            if(extEditingIndex !== -1 && extEditingIndex !== index) { saveExternalEdit(); }
+            
+            const cell = extWin.document.getElementById(`ext-cell-${index}`);
+            if(cell.querySelector('textarea')) return;
+
+            const currentText = sinSubs[index].text;
+            const textarea = extWin.document.createElement('textarea');
+            textarea.value = currentText;
+            attachAssHotkeys(textarea);
+
+            textarea.addEventListener('keydown', function(e) {
+                // Ensure external table handles Tab/Enter effectively without overlapping issues
+                if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+                    e.preventDefault();
+                    e.stopPropagation(); // Block global hotkeys
+                    saveExternalEdit(index, this.value);
+                }
+            });
+            textarea.addEventListener('blur', function() { saveExternalEdit(index, this.value); });
+
+            cell.innerHTML = '';
+            cell.appendChild(textarea);
+            textarea.focus();
+            autoGrow(textarea); textarea.addEventListener('input', () => autoGrow(textarea));
+            
+            extEditingIndex = index;
+            
+            video.currentTime = sinSubs[index].start + 0.001;
+            if(!video.paused) { video.pause(); playBtn.innerHTML = "▶ Play"; }
+        }
+
+        function saveExternalEdit(passedIndex = null, newTextObj = null) {
+            const index = passedIndex !== null ? passedIndex : extEditingIndex;
+            if(index === -1 || !extWin || extWin.closed) return;
+
+            const cell = extWin.document.getElementById(`ext-cell-${index}`);
+            if(!cell) return;
+            
+            const textarea = cell.querySelector('textarea');
+            if(!textarea && newTextObj === null) return;
+            
+            const newText = newTextObj !== null ? newTextObj : textarea.value;
+            
+            updateSubtitleText(index, newText); 
+            extEditingIndex = -1;
+        }
+
+        // --- Universal Data Sync ---
+        function updateSubtitleText(index, newText) {
+            let trimmedText = newText.trim();
+            if (trimmedText === "") {
+                trimmedText = "[No Text]";
+            }
+            sinSubs[index].text = trimmedText;
+            assInvalidate();
+            const formatted = escapeHTML(sinSubs[index].text).replace(/\n/g, '<br>');
+            
+            // Updating DOM in Table and External window
+            const listCell = document.getElementById(`cell-${index}`);
+            if (listCell) listCell.innerHTML = formatted;
+            
+            const miniCell = document.getElementById(`mini-cell-${index}`);
+            if (miniCell) miniCell.innerHTML = formatted;
+            
+            if (extWin && !extWin.closed) {
+                const extCell = extWin.document.getElementById(`ext-cell-${index}`);
+                if (extCell) extCell.innerHTML = formatted;
+            }
+
+            // Force player overlay to re-render to reflect data changes immediately
+            sinSubContainer.dataset.renderState = ""; 
+            if(video.paused) video.dispatchEvent(new Event('timeupdate'));
+        }
+
+        // --- Find & Replace Logic ---
+        function openReplaceModal() {
+            replaceModal.style.display = 'flex';
+            findInput.focus();
+            renderReplaceResults();
+        }
+
+        function closeReplaceModal() {
+            replaceModal.style.display = 'none';
+        }
+
+        function renderReplaceResults() {
+            const term = findInput.value.trim();
+            replaceTbody.innerHTML = '';
+
+            if (sinSubs.length === 0) {
+                replaceTbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px;">No Sinhala subtitle file has been loaded.</td></tr>';
+                return;
+            }
+            if (!term) {
+                replaceTbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px; color: #777;">Type the word you want to search for above.</td></tr>';
+                return;
+            }
+
+            let matchCount = 0;
+            sinSubs.forEach((sub, i) => {
+                if (sub.text.includes(term)) {
+                    matchCount++;
+                    
+                    const matchedEng = getSubtitlesAtTime(engSubs, sub.start + 0.1);
+                    let eText = matchedEng.map(m => m.sub.text).join('\n\n');
+
+                    const escapedTerm = escapeHTML(term);
+                    const escapeRegExp = (string) => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    
+                    let escapedOriginalText = escapeHTML(sub.text);
+                    const escapedRegex = new RegExp(escapeRegExp(escapedTerm), 'g');
+                    let formattedSinText = escapedOriginalText.replace(/\n/g, '<br>').replace(escapedRegex, `<span class="highlight-word">${escapedTerm}</span>`);
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="text-align: center;"><input type="checkbox" class="replace-cb" value="${i}" checked></td>
+                        <td style="font-family: monospace; color: #555;">${secondsToTime(sub.start).slice(0,-4)}</td>
+                        <td class="rep-eng" style="color: #444;">${escapeHTML(eText).replace(/\n/g, '<br>')}</td>
+                        <td>${formattedSinText}</td>
+                    `;
+                    replaceTbody.appendChild(tr);
+                }
+            });
+
+            if (matchCount === 0) {
+                replaceTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #d32f2f;">The word "${escapeHTML(term)}" cannot be found in the subtitle.</td></tr>`;
+            }
+        }
+
+        function applyReplace() {
+            const findTerm = findInput.value;
+            const replaceTerm = replaceInput.value;
+            if(!findTerm) { alert("Please enter the word to search."); return; }
+
+            const checkboxes = document.querySelectorAll('.replace-cb:checked');
+            let replaceCount = 0;
+
+            checkboxes.forEach(cb => {
+                const index = parseInt(cb.value);
+                const currentText = sinSubs[index].text;
+                const newText = currentText.split(findTerm).join(replaceTerm); 
+                
+                if (index === currentEditingIndex) {
+                    const activeTextarea = document.querySelector('.table-edit-input');
+                    if (activeTextarea) activeTextarea.value = activeTextarea.value.split(findTerm).join(replaceTerm);
+                }
+                
+                updateSubtitleText(index, newText);
+                replaceCount++;
+            });
+
+            alert(`Success! Words were replaced in ${replaceCount} places.`);
+            closeReplaceModal();
+            findInput.value = ''; replaceInput.value = '';
+        }
+
+        findInput.addEventListener('input', renderReplaceResults);
+        selectAllReplaceCb.addEventListener('change', (e) => {
+            document.querySelectorAll('.replace-cb').forEach(cb => { cb.checked = e.target.checked; });
+        });
+
+        // --- Table Generation ---
+        function generateTables() {
+            document.body.classList.toggle('no-eng', engSubs.length === 0);
+            tbody.innerHTML = ''; miniTbody.innerHTML = '';
+            
+            sinSubs.forEach((sub, i) => {
+                const dur = (sub.end - sub.start).toFixed(3);
+                
+                const matchedEng = getSubtitlesAtTime(engSubs, sub.start + 0.1);
+                let eText = matchedEng.map(m => m.sub.text).join('\n\n'); 
+
+                const tr = document.createElement('tr'); tr.id = `row-${i}`;
+                tr.innerHTML = `
+                    <td class="col-id">${i + 1}</td>
+                    <td class="col-time">${secondsToTime(sub.start).slice(0,-4)}</td>
+                    <td class="col-time">${secondsToTime(sub.end).slice(0,-4)}</td>
+                    <td class="col-dur">${dur}</td>
+                    <td class="col-eng">${escapeHTML(eText).replace(/\n/g, '<br>')}</td>
+                    <td class="col-sin" id="cell-${i}" onclick="editInTable(${i}, 'main')">${escapeHTML(sub.text).replace(/\n/g, '<br>')}</td>
+                `;
+                tbody.appendChild(tr);
+
+                const miniTr = document.createElement('tr'); miniTr.id = `mini-row-${i}`;
+                miniTr.innerHTML = `
+                    <td class="col-time">${secondsToTime(sub.start).slice(0,-4)}</td>
+                    <td class="col-mini-eng">${escapeHTML(eText).replace(/\n/g, '<br>')}</td>
+                    <td class="col-mini-sin" id="mini-cell-${i}" onclick="editInTable(${i}, 'mini')">${escapeHTML(sub.text).replace(/\n/g, '<br>')}</td>
+                `;
+                miniTbody.appendChild(miniTr);
+            });
+            
+            if(extWin && !extWin.closed) { renderExternalTable(); }
+        }
+
+        // --- Table Editing Logic ---
+        let currentEditingIndex = -1;
+        let currentEditingType = ''; 
+
+        function autoGrow(el) { el.style.height = 'auto'; el.style.height = (el.scrollHeight + 2) + 'px'; }
+
+        function editInTable(index, type) {
+            if(currentEditingIndex !== -1 && currentEditingIndex !== index) { saveTableEdit(); }
+            
+            const cellId = type === 'main' ? `cell-${index}` : `mini-cell-${index}`;
+            const cell = document.getElementById(cellId);
+            if(cell.querySelector('textarea')) return;
+
+            const currentText = sinSubs[index].text;
+            const textarea = document.createElement('textarea');
+            textarea.className = 'table-edit-input';
+            textarea.value = currentText;
+            attachAssHotkeys(textarea);
+
+            textarea.addEventListener('keydown', function(e) {
+                if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') { 
+                    e.preventDefault(); 
+                    e.stopPropagation(); // Stop global hotkeys overlapping
+                    saveTableEdit(index, this.value, type); 
+                }
+            });
+            textarea.addEventListener('blur', function() { saveTableEdit(index, this.value, type); });
+
+            cell.innerHTML = ''; cell.appendChild(textarea); textarea.focus();
+            autoGrow(textarea); textarea.addEventListener('input', () => autoGrow(textarea));
+            currentEditingIndex = index; currentEditingType = type;
+            
+            video.currentTime = sinSubs[index].start + 0.001;
+            if(!video.paused) { video.pause(); playBtn.innerHTML = "▶ Play"; }
+        }
+
+        function saveTableEdit(passedIndex = null, newTextObj = null, type = null) {
+            const index = passedIndex !== null ? passedIndex : currentEditingIndex;
+            const tType = type !== null ? type : currentEditingType;
+            if(index === -1) return;
+
+            const cellId = tType === 'main' ? `cell-${index}` : `mini-cell-${index}`;
+            const cell = document.getElementById(cellId);
+            if(!cell) return;
+            
+            const textarea = cell.querySelector('textarea');
+            if(!textarea && newTextObj === null) return;
+            
+            const newText = newTextObj !== null ? newTextObj : textarea.value;
+            updateSubtitleText(index, newText); 
+            currentEditingIndex = -1; currentEditingType = '';
+        }
+
+        // --- ASS Tags Mode (renders {\an8}, {\pos(x,y)}, {\i1}, {\c&H..&} ... found inside SRT text) ---
+        const assBtn = document.getElementById('ass-btn');
+        const assLayer = document.getElementById('ass-layer');
+        const playerWrapper = document.getElementById('player-wrapper');
+        let assMode = false;
+        try { assMode = localStorage.getItem('subEditorAssMode') === '1'; } catch (e) {}
+        let assResCache = null, assVer = 0;
+        const assParseCache = new Map();
+
+        function setAssMode(on) {
+            assMode = on;
+            try { localStorage.setItem('subEditorAssMode', on ? '1' : '0'); } catch (e) {}
+            assBtn.classList.toggle('on', on);
+            engSubContainer.dataset.rawText = ''; sinSubContainer.dataset.renderState = '';
+            video.dispatchEvent(new Event('timeupdate'));
+        }
+        assBtn.addEventListener('click', () => setAssMode(!assMode));
+        assBtn.classList.toggle('on', assMode);
+        function assInvalidate() { assVer++; assResCache = null; assParseCache.clear(); }
+
+        function parseAss(text) {
+            const cached = assParseCache.get(text);
+            if (cached) return cached;
+            const res = { an: 0, pos: null, segs: [], placed: false };
+            const base = { b: null, i: false, u: false, s: false, c: null, fs: null, fn: null, op: 1 };
+            let st = Object.assign({}, base);
+            const clean = s => s.replace(/\\[Nn]/g, '\n').replace(/\\h/g, ' ');
+            const push = t => { if (t) res.segs.push(Object.assign({ text: t }, st)); };
+            const toColor = v => {
+                const m = /^&?H?([0-9a-f]{1,8})&?$/i.exec(v.trim());
+                if (!m) return undefined;
+                const h = m[1].padStart(6, '0').slice(-6);
+                return '#' + h.slice(4, 6) + h.slice(2, 4) + h.slice(0, 2);
+            };
+            const toAlpha = v => {
+                const m = /^&?H?([0-9a-f]{1,2})&?$/i.exec(v.trim());
+                return m ? 1 - parseInt(m[1], 16) / 255 : undefined;
+            };
+            const applyTags = block => {
+                block = block.replace(/\\t\((?:[^()]|\([^()]*\))*\)/g, '');
+                const re = /\\(an|pos|move|fscx|fscy|fs|fn|alpha|1c|1a|c|b|i|u|s|r|a)(\([^)]*\)|[^\\]*)/g;
+                let m;
+                while ((m = re.exec(block))) {
+                    const tag = m[1], arg = m[2].trim();
+                    if (tag === 'an') { if (!res.an && /^[1-9]$/.test(arg)) res.an = +arg; }
+                    else if (tag === 'a') {
+                        if (!res.an && /^\d+$/.test(arg)) { const n = +arg; res.an = n <= 3 ? n : n <= 7 ? n + 2 : n - 5; }
+                    }
+                    else if (tag === 'pos' || tag === 'move') {
+                        if (!res.pos) {
+                            const p = arg.replace(/^\(|\)$/g, '').split(',').map(parseFloat);
+                            if (p.length >= 2 && !isNaN(p[0]) && !isNaN(p[1])) res.pos = { x: p[0], y: p[1] };
+                        }
+                    }
+                    else if (tag === 'b') { if (/^\d+$/.test(arg)) st.b = (+arg === 1 || +arg >= 700); }
+                    else if (tag === 'i') { if (/^[01]$/.test(arg)) st.i = arg === '1'; }
+                    else if (tag === 'u') { if (/^[01]$/.test(arg)) st.u = arg === '1'; }
+                    else if (tag === 's') { if (/^[01]$/.test(arg)) st.s = arg === '1'; }
+                    else if (tag === 'fs') { const v = parseFloat(arg); if (!isNaN(v) && v > 0 && /^[\d.]+$/.test(arg)) st.fs = v; else if (arg === '') st.fs = null; }
+                    else if (tag === 'fn') { st.fn = arg.replace(/[^\w \-]/g, '') || null; }
+                    else if (tag === 'c' || tag === '1c') {
+                        if (arg === '') st.c = null; else { const c = toColor(arg); if (c) st.c = c; }
+                    }
+                    else if (tag === 'alpha' || tag === '1a') { const a = toAlpha(arg); if (a !== undefined) st.op = a; }
+                    else if (tag === 'r') { st = Object.assign({}, base); }
+                }
+            };
+            // HTML-style tags (<i>, <b>, <u>, <s>, <font color=".." size=".." face="..">) are rendered too
+            const fontStack = [];
+            const applyHtml = tag => {
+                const m = /^<(\/?)(i|b|u|s|font)\b([^>]*)>$/i.exec(tag);
+                if (!m) return;
+                const close = m[1] === '/', name = m[2].toLowerCase(), attrs = m[3];
+                if (name === 'font') {
+                    if (close) { const p = fontStack.pop(); if (p) { st.c = p.c; st.fs = p.fs; st.fn = p.fn; } return; }
+                    fontStack.push({ c: st.c, fs: st.fs, fn: st.fn });
+                    const attr = n => { const a = new RegExp(n + '\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\'|([^\\s>]+))', 'i').exec(attrs); return a ? (a[1] || a[2] || a[3] || '').trim() : ''; };
+                    const col = attr('color');
+                    if (/^#?[0-9a-f]{6}$/i.test(col)) st.c = col[0] === '#' ? col : '#' + col;
+                    else if (/^[a-z]+$/i.test(col)) st.c = col.toLowerCase();
+                    const fn = attr('face').replace(/[^\w \-]/g, '');
+                    if (fn) st.fn = fn;
+                    return;
+                }
+                st[name] = !close;
+            };
+            const re = /\{([^}]*)\}|<\/?(?:i|b|u|s|font)\b[^>]*>/gi;
+            let last = 0, m;
+            while ((m = re.exec(text))) {
+                push(clean(text.slice(last, m.index)));
+                if (m[0][0] === '{') applyTags(m[1]); else applyHtml(m[0]);
+                last = re.lastIndex;
+            }
+            push(clean(text.slice(last)));
+            res.placed = !!(res.an || res.pos);
+            if (assParseCache.size > 5000) assParseCache.clear();
+            assParseCache.set(text, res);
+            return res;
+        }
+
+        // Best guess of the script's PlayRes (needed to place \pos): smallest common resolution that contains every \pos.
+        function getAssRes() {
+            const rkey = engSubs.length + '/' + sinSubs.length + '/' + video.videoWidth + 'x' + video.videoHeight;
+            if (assResCache && assResCache.key === rkey) return assResCache;
+            let mx = 0, my = 0;
+            const scan = subs => subs.forEach(s => {
+                if (s.text.indexOf('\\p') < 0 && s.text.indexOf('\\m') < 0) return;
+                const re = /\\(?:pos|move)\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)/g; let m;
+                while ((m = re.exec(s.text))) { mx = Math.max(mx, +m[1]); my = Math.max(my, +m[2]); }
+            });
+            scan(engSubs); scan(sinSubs);
+            const cands = [[384, 288], [640, 480], [1280, 720], [1920, 1080], [3840, 2160]];
+            if (video.videoWidth) cands.push([video.videoWidth, video.videoHeight]);
+            cands.sort((a, b) => a[0] * a[1] - b[0] * b[1]);
+            const pick = cands.find(c => mx <= c[0] && my <= c[1]) || cands[cands.length - 1];
+            return (assResCache = { w: pick[0], h: pick[1], key: rkey });
+        }
+        window.addEventListener('resize', () => { if (assMode) video.dispatchEvent(new Event('timeupdate')); });
+
+        function updateAssLayer() {
+            const w = playerWrapper.clientWidth, h = playerWrapper.clientHeight;
+            const vw = video.videoWidth || 16, vh = video.videoHeight || 9;
+            const sc = Math.min(w / vw, h / vh), lw = vw * sc, lh = vh * sc;
+            Object.assign(assLayer.style, { left: ((w - lw) / 2) + 'px', top: ((h - lh) / 2) + 'px', width: lw + 'px', height: lh + 'px' });
+            return { w: lw, h: lh };
+        }
+
+        function buildAssHTML(parsed, hover, geom, fallbackFont) {
+            const scale = geom ? geom.h / getAssRes().h : 1;
+            let html = '';
+            parsed.segs.forEach(sg => {
+                let css = '';
+                if (sg.b !== null) css += `font-weight:${sg.b ? 700 : 400};`;
+                if (sg.i) css += 'font-style:italic;';
+                if (sg.u || sg.s) css += `text-decoration:${[sg.u ? 'underline' : '', sg.s ? 'line-through' : ''].join(' ').trim()};`;
+                if (sg.c) css += `color:${sg.c};`;
+                if (sg.fs) css += `font-size:${(sg.fs * scale).toFixed(1)}px;`;
+                if (sg.fn) css += `font-family:'${sg.fn}',${fallbackFont};`;
+                if (sg.op < 1) css += `opacity:${sg.op.toFixed(2)};`;
+                let inner = '';
+                if (hover) {
+                    sg.text.split(/(\s+)/).forEach(tok => {
+                        if (tok.trim() === '') inner += tok.replace(/\n/g, '<br>');
+                        else inner += `<span class="hover-word">${escapeHTML(tok)}</span>`;
+                    });
+                } else inner = escapeHTML(sg.text).replace(/\n/g, '<br>');
+                html += css ? `<span style="${css}">${inner}</span>` : inner;
+            });
+            return html;
+        }
+
+        // Keep a positioned element (e.g. the edit box) inside the video area
+        function clampAss(el, geom) {
+            const lr = assLayer.getBoundingClientRect(), r = el.getBoundingClientRect();
+            let dx = 0, dy = 0;
+            if (r.right > lr.right) dx = lr.right - r.right;
+            if (r.left + dx < lr.left) dx = lr.left - r.left;
+            if (r.bottom > lr.bottom) dy = lr.bottom - r.bottom;
+            if (r.top + dy < lr.top) dy = lr.top - r.top;
+            if (dx) el.style.left = (parseFloat(el.style.left) + dx / geom.w * 100) + '%';
+            if (dy) el.style.top = (parseFloat(el.style.top) + dy / geom.h * 100) + '%';
+        }
+
+        function renderAssLayer(eSubs, sSubs) {
+            if (!assMode) {
+                if (assLayer.dataset.state !== 'off') { assLayer.innerHTML = ''; assLayer.style.display = 'none'; assLayer.dataset.state = 'off'; }
+                return;
+            }
+            assLayer.style.display = 'block';
+            const geom = updateAssLayer();
+            const key = [Math.round(geom.w), Math.round(geom.h), assVer, playerEditingIndex,
+                eSubs.map(s => s.sub.text).join('|||'), sSubs.map(s => s.index + '-' + s.sub.text.length).join('|')].join('#');
+            if (assLayer.dataset.state === key) return;
+            assLayer.dataset.state = key;
+            assLayer.innerHTML = '';
+
+            const res = getAssRes();
+            const zones = {};
+            const alignOf = an => ({ col: (an - 1) % 3, row: Math.floor((an - 1) / 3) }); // col 0/1/2 = L/C/R, row 0/1/2 = bottom/mid/top
+            const getZone = an => {
+                if (zones[an]) return zones[an];
+                const { col, row } = alignOf(an);
+                const z = document.createElement('div');
+                z.className = 'ass-zone';
+                z.style.alignItems = ['flex-start', 'center', 'flex-end'][col];
+                z.style.textAlign = ['left', 'center', 'right'][col];
+                if (row === 2) z.style.top = '4%';
+                else if (row === 1) { z.style.top = '50%'; z.style.transform = 'translateY(-50%)'; }
+                else z.style.bottom = '8%';
+                assLayer.appendChild(z);
+                return (zones[an] = z);
+            };
+            // returns the element the item must be appended to
+            const hostFor = (parsed, wrapperExtra) => {
+                const an = parsed.an || 2;
+                if (!parsed.pos) return { host: getZone(an), wrap: null };
+                const { col, row } = alignOf(an);
+                const wrap = document.createElement('div');
+                wrap.className = 'ass-pos';
+                wrap.style.left = (parsed.pos.x / res.w * 100) + '%';
+                wrap.style.top = (parsed.pos.y / res.h * 100) + '%';
+                wrap.style.transform = `translate(${['0', '-50%', '-100%'][col]},${['-100%', '-50%', '0'][row]})`;
+                wrap.style.textAlign = ['left', 'center', 'right'][col];
+                assLayer.appendChild(wrap);
+                return { host: wrap, wrap };
+            };
+
+            eSubs.forEach(item => {
+                const parsed = parseAss(item.sub.text);
+                if (!parsed.placed) return;
+                const div = document.createElement('div');
+                div.className = 'sub-item eng-item';
+                div.innerHTML = buildAssHTML(parsed, true, geom, 'sans-serif');
+                const { host } = hostFor(parsed);
+                host.appendChild(div);
+            });
+            sSubs.forEach(item => {
+                const parsed = parseAss(item.sub.text);
+                if (!parsed.placed) return;
+                const { host, wrap } = hostFor(parsed);
+                if (item.index === playerEditingIndex) {
+                    const ta = createSinEditor(item);
+                    if (wrap) {
+                        ta.style.width = Math.round(geom.w * 0.6) + 'px';
+                        wrap.style.maxWidth = 'none';
+                        wrap.style.zIndex = 20;
+                    }
+                    host.appendChild(ta);
+                    autoGrow(ta);
+                    if (wrap) { clampAss(wrap, geom); ta.addEventListener('input', () => clampAss(wrap, geom)); }
+                } else {
+                    host.appendChild(createSinItem(item, buildAssHTML(parsed, false, geom, 'var(--sin-font)')));
+                }
+            });
+        }
+
+        function createSinItem(item, html) {
+            const div = document.createElement('div');
+            div.className = 'sub-item sin-item';
+            div.innerHTML = html;
+            div.addEventListener('click', () => {
+                playerEditingIndex = item.index;
+                wasPlayingBeforeEdit = !video.paused;
+                video.pause(); playBtn.innerHTML = "▶ Play";
+                sinSubContainer.dataset.renderState = '';
+                video.dispatchEvent(new Event('timeupdate'));
+            });
+            return div;
+        }
+
+        // Ctrl+U -> put {\an8} at the very start, Ctrl+I -> wrap the whole text in <i> ... </i> (again = remove)
+        function attachAssHotkeys(ta) {
+            ta.addEventListener('keydown', (e) => {
+                if (!e.ctrlKey || e.altKey || e.shiftKey || e.metaKey) return;
+                const k = e.key.toLowerCase();
+                if (k !== 'u' && k !== 'i') return;
+                e.preventDefault(); e.stopPropagation();
+                const v = ta.value, s = ta.selectionStart, en = ta.selectionEnd;
+                if (k === 'u') {
+                    if (v.startsWith('{\\an8}')) return;
+                    ta.value = '{\\an8}' + v;
+                    ta.setSelectionRange(s + 6, en + 6);
+                } else {
+                    // keep leading {...} tag blocks (e.g. {\an8}) at the very start
+                    const lead = /^(\{[^}]*\})*/.exec(v)[0], body = v.slice(lead.length);
+                    if (/^<i>[\s\S]*<\/i>$/.test(body)) {
+                        ta.value = lead + body.slice(3, -4);
+                        ta.setSelectionRange(Math.max(lead.length, s - 3), Math.max(lead.length, en - 3));
+                    } else {
+                        ta.value = lead + '<i>' + body + '</i>';
+                        ta.setSelectionRange(s < lead.length ? s : s + 3, en < lead.length ? en : en + 3);
+                    }
+                }
+                ta.dispatchEvent(new Event('input'));
+            });
+        }
+
+        function createSinEditor(item) {
+            const ta = document.createElement('textarea');
+            ta.id = 'inline-edit-' + item.index;
+            ta.className = 'sin-edit-input';
+            ta.value = item.sub.text;
+            attachAssHotkeys(ta);
+            ta.addEventListener('keydown', (e) => {
+                if ((e.key === 'Enter' && !e.shiftKey) || e.key === 'Tab') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const newText = ta.value;
+                    playerEditingIndex = -1;
+                    updateSubtitleText(item.index, newText);
+                    video.focus();
+                    video.play().catch(err => console.log(err));
+                    playBtn.innerHTML = "⏸ Pause";
+                }
+            });
+            ta.addEventListener('input', () => autoGrow(ta));
+            setTimeout(() => {
+                const activeTagName = document.activeElement ? document.activeElement.tagName : '';
+                if (document.activeElement !== ta && activeTagName !== 'INPUT' && activeTagName !== 'TEXTAREA') {
+                    ta.focus();
+                    ta.setSelectionRange(ta.value.length, ta.value.length);
+                }
+            }, 10);
+            return ta;
+        }
+
+        // --- Video Time Update (Live Sync & Dynamic Overlay Generator) ---
+        video.addEventListener('timeupdate', () => {
+            const t = video.currentTime;
+            progressBar.max = video.duration || 0;
+            progressBar.value = t;
+            progressBar.style.setProperty('--pct', (video.duration ? (t / video.duration * 100) : 0) + '%');
+            timeLabel.innerText = `${formatDisplayTime(t)} / ${formatDisplayTime(video.duration)}`;
+            
+            // 1. Process English Overlays
+            const eSubs = getSubtitlesAtTime(engSubs, t);
+            const assGeom = assMode ? updateAssLayer() : null;
+            const assKey = assMode ? ('#ass' + Math.round(assGeom.w) + 'x' + Math.round(assGeom.h) + 'v' + assVer) : '';
+            const eRawText = eSubs.map(s => s.sub.text).join('|||') + assKey; // Unique string to check if render changed
+
+            if (engSubContainer.dataset.rawText !== eRawText) {
+                engSubContainer.innerHTML = ''; // Clear container
+                eSubs.forEach(item => {
+                    const parsed = assMode ? parseAss(item.sub.text) : null;
+                    if (parsed && parsed.placed) return; // drawn by the ASS layer
+                    const div = document.createElement('div');
+                    div.className = 'sub-item eng-item';
+
+                    if (parsed) {
+                        div.innerHTML = buildAssHTML(parsed, true, assGeom, 'sans-serif');
+                    } else {
+                        // Hoverable words tokenization
+                        const tokens = item.sub.text.split(/(\s+)/);
+                        let html = '';
+                        tokens.forEach(token => {
+                            if (token.trim() === '') html += token.replace(/\n/g, '<br>');
+                            else html += `<span class="hover-word">${escapeHTML(token)}</span>`;
+                        });
+                        div.innerHTML = html;
+                    }
+                    engSubContainer.appendChild(div);
+                });
+                engSubContainer.dataset.rawText = eRawText;
+            }
+
+            // 2. Process Sinhala Overlays & Inline Edit States
+            const sSubs = getSubtitlesAtTime(sinSubs, t);
+            const newIndices = sSubs.map(s => s.index);
+            renderAssLayer(eSubs, sSubs);
+
+            let sRenderState = "";
+            for(let i = 0; i < sSubs.length; i++) {
+                sRenderState += sSubs[i].index + "-" + sSubs[i].sub.text.length + "|";
+            }
+            sRenderState += playerEditingIndex + assKey;
+
+            if (sinSubContainer.dataset.renderState !== sRenderState) {
+                
+                // Securely save active inline edit before discarding it if it goes out of time bounds
+                if (playerEditingIndex !== -1 && !newIndices.includes(playerEditingIndex)) {
+                     const activeTextarea = document.getElementById('inline-edit-' + playerEditingIndex);
+                     const savedIdx = playerEditingIndex;
+                     playerEditingIndex = -1; // Update BEFORE updateSubtitleText
+                     if (activeTextarea) updateSubtitleText(savedIdx, activeTextarea.value);
+                }
+
+                sinSubContainer.innerHTML = ''; // Clear existing overlays
+
+                sSubs.forEach(item => {
+                    const parsed = assMode ? parseAss(item.sub.text) : null;
+                    if (parsed && parsed.placed) return; // drawn by the ASS layer
+                    if (item.index === playerEditingIndex) {
+                        // Render Textarea for active edit (always raw text, tags included)
+                        const ta = createSinEditor(item);
+                        sinSubContainer.appendChild(ta);
+                        autoGrow(ta);
+                    } else {
+                        // Render standard clickable overlay Div
+                        const html = parsed ? buildAssHTML(parsed, false, assGeom, 'var(--sin-font)')
+                                            : escapeHTML(item.sub.text).replace(/\n/g, '<br>');
+                        sinSubContainer.appendChild(createSinItem(item, html));
+                    }
+                });
+
+                let updatedRenderState = "";
+                for(let i = 0; i < sSubs.length; i++) {
+                    updatedRenderState += sSubs[i].index + "-" + sSubs[i].sub.text.length + "|";
+                }
+                updatedRenderState += playerEditingIndex + assKey;
+                sinSubContainer.dataset.renderState = updatedRenderState;
+            }
+
+            // 3. Highlight Lists (Handling Multiple Overlapping Rows)
+            const oldIndices = currentSinIndices;
+            
+            // Remove old highlights
+            oldIndices.forEach(idx => {
+                if (!newIndices.includes(idx)) {
+                    document.getElementById(`row-${idx}`)?.classList.remove('active-row');
+                    document.getElementById(`mini-row-${idx}`)?.classList.remove('active-row');
+                    if (extWin && !extWin.closed) { extWin.document.getElementById(`ext-row-${idx}`)?.classList.remove('active-row'); }
+                }
+            });
+            
+            // Add new highlights
+            newIndices.forEach(idx => {
+                if (!oldIndices.includes(idx)) {
+                    document.getElementById(`row-${idx}`)?.classList.add('active-row');
+                    document.getElementById(`mini-row-${idx}`)?.classList.add('active-row');
+                    if (extWin && !extWin.closed) {
+                        const extRow = extWin.document.getElementById(`ext-row-${idx}`);
+                        if(extRow) {
+                            extRow.classList.add('active-row');
+                            if(extAutoScroll && extEditingIndex === -1) extRow.scrollIntoView({ behavior: 'auto', block: 'center' });
+                        }
+                    }
+                }
+            });
+
+            // Scroll Execution (Triggers when the array composition changes)
+            if (newIndices.length > 0 && JSON.stringify(newIndices) !== JSON.stringify(oldIndices)) {
+                if (isAutoScrollEnabled && currentEditingIndex === -1) scrollToActiveRow('main');
+                if (isMiniAutoScrollEnabled && currentEditingIndex === -1 && miniWindow.style.display === 'flex') scrollToActiveRow('mini');
+            }
+
+            currentSinIndices = newIndices;
+        });
+
+        function scrollToActiveRow(type) {
+            let activeRow;
+            if(type === 'main') activeRow = document.querySelector('#sub-tbody .active-row'); // Grabs the first active overlap
+            if(type === 'mini') activeRow = document.querySelector('#mini-tbody .active-row');
+            if(activeRow) { activeRow.scrollIntoView({ behavior: 'auto', block: 'center' }); }
+        }
+
+        tableScrollArea.addEventListener('wheel', () => { if(isAutoScrollEnabled) toggleAutoScroll(false); });
+        tableScrollArea.addEventListener('touchmove', () => { if(isAutoScrollEnabled) toggleAutoScroll(false); });
+        miniTableWrapper.addEventListener('wheel', () => { if(isMiniAutoScrollEnabled) toggleMiniAutoScroll(false); });
+        miniTableWrapper.addEventListener('touchmove', () => { if(isMiniAutoScrollEnabled) toggleMiniAutoScroll(false); });
+
+        function toggleAutoScroll(forceState = null) {
+            isAutoScrollEnabled = forceState !== null ? forceState : !isAutoScrollEnabled;
+            if(isAutoScrollEnabled) { autoScrollBtn.innerHTML = "Auto Scroll: ON"; autoScrollBtn.className = "btn-blue"; scrollToActiveRow('main'); }
+            else { autoScrollBtn.innerHTML = "Auto Scroll: OFF"; autoScrollBtn.className = "btn-orange"; }
+        }
+
+        function toggleMiniAutoScroll(forceState = null) {
+            isMiniAutoScrollEnabled = forceState !== null ? forceState : !isMiniAutoScrollEnabled;
+            if(isMiniAutoScrollEnabled) { miniAutoScrollBtn.innerHTML = "Auto Scroll: ON"; miniAutoScrollBtn.className = "btn-blue"; scrollToActiveRow('mini'); } 
+            else { miniAutoScrollBtn.innerHTML = "Auto Scroll: OFF"; miniAutoScrollBtn.className = "btn-orange"; }
+        }
+
+        // --- Floating Mini Window Logic ---
+        function toggleMiniWindow() {
+            if (miniWindow.style.display === 'flex') { miniWindow.style.display = 'none'; }
+            else { miniWindow.style.display = 'flex'; if(isMiniAutoScrollEnabled) scrollToActiveRow('mini'); }
+        }
+
+        let isDragging = false, startX, startY, startLeft, startTop;
+        miniHeader.addEventListener('mousedown', (e) => {
+            if(e.target.tagName === 'SPAN' && e.target.innerText === '✖') return; 
+            isDragging = true; startX = e.clientX; startY = e.clientY;
+            startLeft = miniWindow.offsetLeft; startTop = miniWindow.offsetTop;
+            document.body.style.userSelect = 'none'; 
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            
+            let newLeft = startLeft + (e.clientX - startX);
+            let newTop = startTop + (e.clientY - startY);
+            
+            newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - miniWindow.offsetWidth));
+            newTop = Math.max(0, Math.min(newTop, window.innerHeight - miniHeader.offsetHeight));
+            
+            miniWindow.style.left = newLeft + 'px';
+            miniWindow.style.top = newTop + 'px';
+            miniWindow.style.bottom = 'auto'; 
+            miniWindow.style.right = 'auto'; 
+        });
+
+        // --- Mini window: resize from any edge/corner + remember geometry ---
+        const MINI_KEY = 'miniWindowRect';
+        const MINI_MIN_W = 420, MINI_MIN_H = 280;
+        function saveMiniRect() {
+            try {
+                localStorage.setItem(MINI_KEY, JSON.stringify({
+                    left: miniWindow.offsetLeft, top: miniWindow.offsetTop,
+                    width: miniWindow.offsetWidth, height: miniWindow.offsetHeight
+                }));
+            } catch (e) {}
+        }
+        function restoreMiniRect() {
+            try {
+                const r = JSON.parse(localStorage.getItem(MINI_KEY));
+                if (!r) return;
+                const w = Math.min(Math.max(r.width, MINI_MIN_W), window.innerWidth);
+                const h = Math.min(Math.max(r.height, MINI_MIN_H), window.innerHeight);
+                miniWindow.style.width = w + 'px'; miniWindow.style.height = h + 'px';
+                miniWindow.style.left = Math.max(0, Math.min(r.left, window.innerWidth - w)) + 'px';
+                miniWindow.style.top = Math.max(0, Math.min(r.top, window.innerHeight - h)) + 'px';
+                miniWindow.style.right = 'auto'; miniWindow.style.bottom = 'auto';
+            } catch (e) {}
+        }
+        restoreMiniRect();
+
+        let rzDir = null, rzStart = null;
+        ['n','s','e','w','ne','nw','se','sw'].forEach(dir => {
+            const h = document.createElement('div');
+            h.className = 'mini-rz'; h.dataset.dir = dir;
+            h.addEventListener('mousedown', (e) => {
+                e.preventDefault(); e.stopPropagation();
+                rzDir = dir;
+                rzStart = { x: e.clientX, y: e.clientY, l: miniWindow.offsetLeft, t: miniWindow.offsetTop, w: miniWindow.offsetWidth, h: miniWindow.offsetHeight };
+                document.body.style.userSelect = 'none';
+            });
+            miniWindow.appendChild(h);
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!rzDir) return;
+            const dx = e.clientX - rzStart.x, dy = e.clientY - rzStart.y;
+            let l = rzStart.l, t = rzStart.t, w = rzStart.w, h = rzStart.h;
+            if (rzDir.includes('e')) w = Math.min(Math.max(MINI_MIN_W, rzStart.w + dx), window.innerWidth - l);
+            if (rzDir.includes('s')) h = Math.min(Math.max(MINI_MIN_H, rzStart.h + dy), window.innerHeight - t);
+            if (rzDir.includes('w')) { w = Math.max(MINI_MIN_W, rzStart.w - dx); l = rzStart.l + rzStart.w - w; if (l < 0) { w += l; l = 0; } }
+            if (rzDir.includes('n')) { h = Math.max(MINI_MIN_H, rzStart.h - dy); t = rzStart.t + rzStart.h - h; if (t < 0) { h += t; t = 0; } }
+            miniWindow.style.left = l + 'px'; miniWindow.style.top = t + 'px';
+            miniWindow.style.width = w + 'px'; miniWindow.style.height = h + 'px';
+            miniWindow.style.right = 'auto'; miniWindow.style.bottom = 'auto';
+        });
+
+        document.addEventListener('mouseup', () => {
+            const wasActive = isDragging || rzDir;
+            isDragging = false; rzDir = null; document.body.style.userSelect = '';
+            if (wasActive) saveMiniRect();
+        });
+
+        function togglePlay() {
+            if (!video.src) return;
+            initAudioAPI();
+            
+            // If the user clicks play while editing a subtitle overlay on screen, save it immediately
+            if (playerEditingIndex !== -1) {
+                const activeTextarea = document.getElementById('inline-edit-' + playerEditingIndex);
+                const savedIdx = playerEditingIndex;
+                playerEditingIndex = -1; // Reset state BEFORE updating data
+                if (activeTextarea) updateSubtitleText(savedIdx, activeTextarea.value);
+            }
+
+            if (video.paused) { video.play(); playBtn.innerHTML = "⏸ Pause"; } else { video.pause(); playBtn.innerHTML = "▶ Play"; }
+        }
+        playBtn.addEventListener('click', togglePlay);
+
+        document.getElementById('fs-btn').addEventListener('click', () => {
+            if (!document.fullscreenElement) document.body.requestFullscreen().catch(err => console.log(err));
+            else document.exitFullscreen();
+        });
+
+        progressBar.addEventListener('input', () => { video.currentTime = progressBar.value; progressBar.style.setProperty('--pct', (video.duration ? (progressBar.value / video.duration * 100) : 0) + '%'); });
+
+        // Smooth subtitle sync: tick ~12x/second while playing (the native timeupdate only fires 4x/second)
+        let rafActive = false, lastTick = 0;
+        function rafTick(ts) {
+            if (video.paused || video.ended) { rafActive = false; return; }
+            if (ts - lastTick > 80) { lastTick = ts; video.dispatchEvent(new Event('timeupdate')); }
+            requestAnimationFrame(rafTick);
+        }
+        video.addEventListener('play', () => { if (!rafActive) { rafActive = true; requestAnimationFrame(rafTick); } });
+
+        // --- Keyboard Shortcuts ---
+        document.addEventListener('keydown', (e) => {
+            if (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT') {
+                return;
+            }
+
+            if (e.key === 'Control') {
+                e.preventDefault(); openReplaceModal(); return;
+            }
+            if (e.key === 'F2') { 
+                e.preventDefault(); openExternalEditor(); return;
+            }
+
+            if (e.key === 'Shift') { e.preventDefault(); toggleMiniWindow(); } 
+            else if (e.key === 'Tab') {
+                e.preventDefault();
+                // Tab functionality logic properly segmented
+                if (playerEditingIndex !== -1) {
+                    // Fallback: If you lost focus from the input box but playerEditingIndex was still active
+                    // Pressing Tab will manually catch it, save it, and play.
+                    const activeTextarea = document.getElementById('inline-edit-' + playerEditingIndex);
+                    const savedIdx = playerEditingIndex;
+                    playerEditingIndex = -1; // Reset state first
+                    if (activeTextarea) updateSubtitleText(savedIdx, activeTextarea.value);
+                    video.focus();
+                    video.play().catch(err => console.log(err)); 
+                    playBtn.innerHTML = "⏸ Pause";
+                } else if (currentSinIndices.length > 0) {
+                    // If no edit is active, start editing the first (top-most) subtitle on the screen
+                    playerEditingIndex = currentSinIndices[0];
+                    video.pause(); 
+                    playBtn.innerHTML = "▶ Play";
+                    sinSubContainer.dataset.renderState = ""; 
+                    video.dispatchEvent(new Event('timeupdate'));
+                }
+            }
+            else if (e.key === '=') {
+                e.preventDefault();
+                if (isTranslatePopupOpen) { translatePopup.style.display = 'none'; isTranslatePopupOpen = false; } 
+                else {
+                    const t = video.currentTime;
+                    const eSubs = getSubtitlesAtTime(engSubs, t);
+                    const combinedEngText = eSubs.map(s => s.sub.text).join(' ');
+                    const selectedText = window.getSelection().toString().trim();
+                    
+                    let textToTranslate = selectedText ? selectedText : (currentlyHoveredWord ? currentlyHoveredWord : combinedEngText);
+                    let isWordMode = selectedText || currentlyHoveredWord ? true : false;
+                    
+                    if (textToTranslate) {
+                        if (!video.paused) { video.pause(); playBtn.innerHTML = "▶ Play"; }
+                        isTranslatePopupOpen = true;
+                        const urlSafeText = textToTranslate.replace(/\n/g, ' '); 
+                        const finalDisplayText = isWordMode ? `"${escapeHTML(textToTranslate).replace(/\n/g, '<br>')}"` : escapeHTML(textToTranslate).replace(/\n/g, '<br>');
+                        
+                        translatePopup.innerHTML = `<div class="eng-text">${finalDisplayText}</div><div class="sin-text">⏳ Translating...</div><div class="close-hint">(Click outside the popup to close)</div>`;
+                        translatePopup.style.display = 'block';
+                        
+                        fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=si&dt=t&q=${encodeURIComponent(urlSafeText)}`)
+                            .then(res => res.json())
+                            .then(data => {
+                                let translatedText = "";
+                                if (data && data[0]) data[0].forEach(item => { if (item[0]) translatedText += item[0] + " "; });
+                                if (translatedText.trim()) translatePopup.innerHTML = `<div class="eng-text">${finalDisplayText}</div><div class="sin-text">${escapeHTML(translatedText.trim())}</div><div class="close-hint">(Click outside the popup to close)</div>`;
+                                else translatePopup.innerHTML = `<div class="eng-text">${finalDisplayText}</div><div class="sin-text" style="color:#e57373;">❌ Translation failed</div><div class="close-hint">(Click outside the popup to close)</div>`;
+                            }).catch(err => {
+                                translatePopup.innerHTML = `<div class="eng-text">${finalDisplayText}</div><div class="sin-text" style="color:#e57373;">❌ Network error</div><div class="close-hint">(Click outside the popup to close)</div>`;
+                            });
+                    } else { showOSD("No English subtitle or selected word found at this time"); }
+                }
+            }
+            else if (e.key === ' ' || e.code === 'Space') { 
+                if (document.activeElement.tagName === 'BUTTON') return; // Allow spacebar to trigger focused buttons
+                e.preventDefault(); 
+                togglePlay(); 
+            } 
+            else if (e.key === 'ArrowRight') { e.preventDefault(); video.currentTime = Math.min(video.duration, video.currentTime + (parseFloat(document.getElementById('seek-time-input').value) || 5.0)); } 
+            else if (e.key === 'ArrowLeft') { e.preventDefault(); video.currentTime = Math.max(0, video.currentTime - (parseFloat(document.getElementById('seek-time-input').value) || 5.0)); } 
+            else if (e.key === 'ArrowUp') {
+                e.preventDefault(); 
+                initAudioAPI(); 
+                playerVolume = Math.min(2.0, parseFloat((playerVolume + 0.1).toFixed(1))); 
+                applyVolume();
+                showOSD(`Volume: ${Math.round(playerVolume * 100)}%`);
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault(); 
+                initAudioAPI(); 
+                playerVolume = Math.max(0.0, parseFloat((playerVolume - 0.1).toFixed(1))); 
+                applyVolume();
+                showOSD(`Volume: ${Math.round(playerVolume * 100)}%`);
+            }
+        });
+
+        // --- Settings (persistent) ---
+        const settingsBtn = document.getElementById('settings-btn'); const settingsPanel = document.getElementById('settings-panel');
+        const SETTINGS_KEY = 'subEditorSettingsV2';
+        const settings = { engPos: 'left', engSize: 22, sinSize: 50, sinColor: '#ffffff', tableSize: 20, seek: 5 };
+        try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}')); } catch (e) {}
+        const colorSelect = document.getElementById('sin-color-select'), colorInput = document.getElementById('sin-color-input');
+        function saveSettings() { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) {} }
+        function applySettings() {
+            const root = document.documentElement.style;
+            root.setProperty('--eng-text-align', settings.engPos);
+            root.setProperty('--eng-font-size', settings.engSize + 'px');
+            root.setProperty('--sin-font-size', settings.sinSize + 'px');
+            root.setProperty('--sin-color', settings.sinColor);
+            root.setProperty('--table-font-size', settings.tableSize + 'px');
+            applyExtVars();
+        }
+        function syncSettingsInputs() {
+            document.getElementById('eng-pos-select').value = settings.engPos;
+            document.getElementById('eng-size-input').value = settings.engSize;
+            document.getElementById('sin-size-input').value = settings.sinSize;
+            document.getElementById('table-size-input').value = settings.tableSize;
+            document.getElementById('seek-time-input').value = settings.seek;
+            const preset = Array.from(colorSelect.options).find(o => o.value === settings.sinColor);
+            colorSelect.value = preset ? preset.value : 'custom';
+            colorInput.value = settings.sinColor;
+            colorInput.style.display = preset ? 'none' : 'inline-block';
+        }
+        syncSettingsInputs(); applySettings();
+
+        settingsBtn.addEventListener('click', () => { settingsPanel.style.display = settingsPanel.style.display === 'flex' ? 'none' : 'flex'; });
+        function numSetting(id, key, min, max, float) {
+            document.getElementById(id).addEventListener('input', (e) => {
+                const v = float ? parseFloat(e.target.value) : parseInt(e.target.value, 10);
+                if (!isNaN(v) && v >= min && v <= max) { settings[key] = v; saveSettings(); applySettings(); sinSubContainer.dataset.renderState = ''; }
+            });
+        }
+        numSetting('eng-size-input', 'engSize', 8, 200); numSetting('sin-size-input', 'sinSize', 8, 200);
+        numSetting('table-size-input', 'tableSize', 12, 40); numSetting('seek-time-input', 'seek', 0.1, 600, true);
+        document.getElementById('eng-pos-select').addEventListener('change', (e) => { settings.engPos = e.target.value; saveSettings(); applySettings(); });
+        colorSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'custom') { colorInput.style.display = 'inline-block'; colorInput.click(); }
+            else { colorInput.style.display = 'none'; settings.sinColor = e.target.value; saveSettings(); applySettings(); }
+        });
+        colorInput.addEventListener('input', (e) => { settings.sinColor = e.target.value; saveSettings(); applySettings(); });
+
+        document.addEventListener('click', (e) => { if (!settingsPanel.contains(e.target) && !settingsBtn.contains(e.target)) settingsPanel.style.display = 'none'; });
+
+        // --- Double-click on the video area toggles Play / Pause ---
+        document.getElementById('player-wrapper').addEventListener('dblclick', (e) => {
+            if (e.target.id === 'player-wrapper' || e.target.tagName === 'VIDEO') togglePlay();
+        });
+
+        // --- Mouse wheel changes the volume (like a normal player) ---
+        document.getElementById('player-wrapper').addEventListener('wheel', (e) => {
+            e.preventDefault();
+            initAudioAPI();
+            playerVolume = Math.max(0, Math.min(2, parseFloat((playerVolume + (e.deltaY < 0 ? 0.05 : -0.05)).toFixed(2))));
+            applyVolume();
+            showOSD(`Volume: ${Math.round(playerVolume * 100)}%`);
+        }, { passive: false });
+
+        // --- Full screen: the control bar slides up when the mouse touches the bottom edge (VLC / PotPlayer style) ---
+        const controlsBar = document.getElementById('controls-container');
+        const hotzone = document.getElementById('fs-hotzone');
+        let fsIdleTimer = null, fsHideTimer = null, fsLastY = -1;
+        const inFs = () => !!document.fullscreenElement;
+        // Position based (not :hover based) so it also works when the bar slides under a motionless mouse
+        function overBar() { return fsLastY >= window.innerHeight - controlsBar.getBoundingClientRect().height - 8; }
+        function fsShow() {
+            if (!inFs()) return;
+            clearTimeout(fsHideTimer); fsHideTimer = null;
+            document.body.classList.add('show-controls');
+            document.body.classList.remove('hide-cursor');
+        }
+        function fsScheduleHide() {
+            if (fsHideTimer) return;
+            fsHideTimer = setTimeout(() => {
+                fsHideTimer = null;
+                if (!inFs()) return;
+                if (overBar() || settingsPanel.style.display === 'flex') { fsScheduleHide(); return; }
+                document.body.classList.remove('show-controls');
+            }, 700);
+        }
+        function fsCursorIdle() {
+            clearTimeout(fsIdleTimer);
+            fsIdleTimer = setTimeout(() => {
+                if (inFs() && !overBar()) document.body.classList.add('hide-cursor');
+            }, 2000);
+        }
+        hotzone.addEventListener('mouseenter', fsShow);
+        hotzone.addEventListener('mousemove', fsShow);
+        controlsBar.addEventListener('mouseenter', fsShow);
+        controlsBar.addEventListener('mousemove', fsShow);
+        controlsBar.addEventListener('mouseleave', () => { if (inFs()) fsScheduleHide(); });
+        document.documentElement.addEventListener('mouseleave', () => { fsLastY = -1; if (inFs()) fsScheduleHide(); });
+        document.addEventListener('mousemove', (e) => {
+            fsLastY = e.clientY;
+            if (!inFs()) return;
+            document.body.classList.remove('hide-cursor');
+            fsCursorIdle();
+            if (e.clientY > window.innerHeight - 90) fsShow();   // backup in case the edge strip is missed
+            else if (document.body.classList.contains('show-controls') && !overBar()) fsScheduleHide();
+        });
+        document.addEventListener('fullscreenchange', () => {
+            const on = inFs();
+            document.body.classList.toggle('fs-mode', on);
+            document.body.classList.remove('show-controls', 'hide-cursor');
+            clearTimeout(fsIdleTimer); clearTimeout(fsHideTimer); fsHideTimer = null;
+            if (on) fsCursorIdle();
+        });
+
+        // --- How To Use guide ---
+        const helpModal = document.getElementById('help-modal');
+        function openHelp() { helpModal.classList.add('open'); helpModal.querySelector('.help-body').scrollTop = 0; }
+        function closeHelp() { helpModal.classList.remove('open'); }
+        document.addEventListener('keydown', (e) => {
+            const open = helpModal.classList.contains('open');
+            if (e.key === 'F1') { e.preventDefault(); e.stopPropagation(); open ? closeHelp() : openHelp(); return; }
+            if (open) {
+                if (e.key === 'Escape') closeHelp();
+                e.stopPropagation();          // keep player shortcuts quiet while the guide is open
+            }
+        }, true);
+
+        // --- Close Translate Popup on Outside Click ---
+        window.addEventListener('click', (e) => {
+            if (isTranslatePopupOpen && (e.target.id === 'player-wrapper' || e.target.tagName === 'VIDEO')) {
+                translatePopup.style.display = 'none';
+                isTranslatePopupOpen = false;
+            }
+        });
+
+        // --- Audio Tracks (Polling System) ---
+        function loadAudioTracksUI() {
+            if (probedTracks) return;
+            if (!video.audioTracks) { audioSelect.innerHTML = '<option value="-1" disabled>Audio API Not Supported</option>'; return; }
+            if (video.audioTracks.length === 0 || (audioSelect.options.length === video.audioTracks.length && audioSelect.options[0].value !== "-1")) return;
+            audioSelect.innerHTML = '';
+            for (let i = 0; i < video.audioTracks.length; i++) {
+                const track = video.audioTracks[i]; const option = document.createElement('option');
+                option.value = i; option.text = `${i + 1}. ` + ([track.label, track.language].filter(Boolean).join(' - ') || `Audio Track ${i + 1}`); 
+                if (track.enabled) option.selected = true; audioSelect.appendChild(option);
+            }
+        }
+        
+        video.addEventListener('loadedmetadata', () => {
+            loadAudioTracksUI();
+            let pollAttempts = 0;
+            let audioPoll = setInterval(() => {
+                if (video.audioTracks && video.audioTracks.length > 0) loadAudioTracksUI();
+                if (++pollAttempts > 20) clearInterval(audioPoll);
+            }, 500);
+
+            // Play from loaded LocalStorage session
+            if (pendingCookieTime > 0) {
+                video.currentTime = pendingCookieTime;
+                pendingCookieTime = 0; 
+                video.play().catch(e => console.log(e));
+                playBtn.innerHTML = "⏸ Pause";
+                showOSD("▶ Resumed from Auto-Saved Data!");
+            }
+        });
+
+        if (video.audioTracks) { video.audioTracks.addEventListener('addtrack', loadAudioTracksUI); video.audioTracks.addEventListener('removetrack', loadAudioTracksUI); }
+        audioSelect.addEventListener('change', (e) => {
+            if (probedTracks) { selectAudioTrack(parseInt(e.target.value)); return; }
+            if (!video.audioTracks) return;
+            for (let i = 0; i < video.audioTracks.length; i++) video.audioTracks[i].enabled = (i === parseInt(e.target.value));
+        });
+
+        // --- Save / Download SRT Logic ---
+        
+        function buildSRT() {
+            let srtContent = "";
+            sinSubs.forEach((sub, i) => { srtContent += `${i + 1}\n${secondsToTime(sub.start)} --> ${secondsToTime(sub.end)}\n${sub.text}\n\n`; });
+            return srtContent;
+        }
+
+        // 1. Save directly to the original file
+        async function saveToOriginalSRT() {
+            if (sinSubs.length === 0) { alert("Please load Sinhala SRT first!"); return; }
+            const srtContent = buildSRT();
+
+            // Desktop app: write straight to disk (no dialog once the file path is known)
+            if (window.nativeApi && window.nativeApi.writeFile) {
+                try {
+                    let p = srtFilePath;
+                    if (!p) {
+                        p = await window.nativeApi.saveDialog('Corrected_Sinhala.srt');
+                        if (!p) return;
+                        srtFilePath = p;
+                    }
+                    await window.nativeApi.writeFile(p, srtContent);
+                    showOSD("✅ Saved to the original file!");
+                } catch (err) { console.error(err); alert("Failed to save the file: " + err.message); }
+                return;
+            }
+
+            if (!window.showSaveFilePicker) { alert("Your browser does not support directly modifying local files. Please use 'Download New SRT'."); return; }
+            try {
+                if (!srtFileHandle) srtFileHandle = await window.showSaveFilePicker({ types: [{ description: 'SRT Subtitle File', accept: { 'text/plain': ['.srt'] } }] });
+                const writable = await srtFileHandle.createWritable();
+                await writable.write(srtContent);
+                await writable.close();
+                showOSD("✅ Changes saved directly to the original file!");
+            } catch (err) {
+                console.error("Save failed:", err);
+                if (err.name !== 'AbortError') { alert("Failed to save the file."); srtFileHandle = null; }
+            }
+        }
+
+        // Attach event listeners to all 'Save to Original' buttons
+        document.querySelectorAll('.overwrite-btn').forEach(btn => {
+            btn.addEventListener('click', saveToOriginalSRT);
+        });
+
+        // 2. Save as a new file
+        document.querySelectorAll('.save-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                if (sinSubs.length === 0) { alert("Please load Sinhala SRT first!"); return; }
+                const srtContent = buildSRT();
+                if (window.nativeApi && window.nativeApi.writeFile) {
+                    const dir = srtFilePath ? srtFilePath.replace(/[^\\/]+$/, '') : '';
+                    const p = await window.nativeApi.saveDialog(dir + 'Corrected_Sinhala.srt');
+                    if (!p) return;
+                    await window.nativeApi.writeFile(p, srtContent);
+                    showOSD("✅ Saved!");
+                    return;
+                }
+                const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([srtContent], { type: "text/plain;charset=utf-8" }));
+                link.download = "Corrected_Sinhala.srt"; link.click();
+            });
+        });
+
+    </script>
+</body>
+</html>
